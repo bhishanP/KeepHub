@@ -22,7 +22,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.ui.platform.LocalContext
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -101,6 +100,19 @@ fun WordDetailScreen(
                     Text("${i + 1}. ${s.definition}")
                     val meta = listOfNotNull(s.pos, s.ipa).joinToString(" • ")
                     if (meta.isNotBlank()) Text(meta, color = MaterialTheme.colorScheme.secondary)
+                    ExamplesBlock(s.examples)
+                    if (s.synonyms.isNotEmpty()) {
+                        Spacer(Modifier.height(6.dp))
+                        Text("Synonyms", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.secondary)
+                        Spacer(Modifier.height(4.dp))
+                        s.synonyms.take(8).forEach { syn -> Text("• $syn", style = MaterialTheme.typography.bodyMedium) }
+                    }
+                    if (s.antonyms.isNotEmpty()) {
+                        Spacer(Modifier.height(6.dp))
+                        Text("Antonyms", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.secondary)
+                        Spacer(Modifier.height(4.dp))
+                        s.antonyms.take(8).forEach { ant -> Text("• $ant", style = MaterialTheme.typography.bodyMedium) }
+                    }
 
                     if (s.audioUrls.isNotEmpty()) {
                         Spacer(Modifier.height(4.dp))
@@ -163,6 +175,18 @@ fun ErrorState(
         }
     }
 }
+@Composable
+private fun ExamplesBlock(examples: List<String>) {
+    if (examples.isEmpty()) return
+    Spacer(Modifier.height(6.dp))
+    Text("Examples", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.secondary)
+    Spacer(Modifier.height(4.dp))
+    examples.forEach { ex ->
+        Text("• $ex", style = MaterialTheme.typography.bodyMedium)
+        Spacer(Modifier.height(2.dp))
+    }
+}
+
 @Composable
 fun AudioChip(url: String) {
     var playing by remember { mutableStateOf(false) }

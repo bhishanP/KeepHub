@@ -11,14 +11,18 @@ import kotlinx.coroutines.launch
 import java.time.LocalDate
 import kotlin.math.max
 import kotlin.random.Random
+import com.keephub.app.ui.review.AnswerRow
+import com.keephub.app.ui.review.Question
+import com.keephub.app.ui.review.QuizMode
 
 data class ReviewUi(
     val stage: Stage = Stage.Idle,
     val total: Int = 0,
-    val index: Int = 0,                 // 0-based
+    val index: Int = 0,
     val current: Question? = null,
     val correctCount: Int = 0,
     val elapsedMs: Long = 0L,
+    val summary: List<AnswerRow> = emptyList(),
     val error: String? = null
 ) {
     enum class Stage { Idle, InProgress, Finished }
@@ -39,17 +43,13 @@ class ReviewViewModel @Inject constructor(
     private var enabledModes: List<QuizMode> = listOf(QuizMode.MCQ, QuizMode.TYPE, QuizMode.CLOZE)
     private var targetGoal: Int = 10
 
+    private val collected = mutableListOf<AnswerRow>()  // ← NEW: accumulate answers
+
     init {
-        // Pull quiz modes & goal live
         viewModelScope.launch {
             combine(settings.quizModes, settings.dailyGoal) { modes, goal ->
                 enabledModes = modes.mapNotNull {
-                    when (it.uppercase()) {
-                        "MCQ" -> QuizMode.MCQ
-                        "TYPE" -> QuizMode.TYPE
-                        "CLOZE" -> QuizMode.CLOZE
-                        else -> null
-                    }
+                    when (it.uppercase()) { "MCQ" -> QuizMode.MCQ; "TYPE" -> QuizMode.TYPE; "CLOZE" -> QuizMode.CLOZE; else -> null }
                 }.ifEmpty { listOf(QuizMode.MCQ) }
                 targetGoal = max(1, goal)
             }.collect()
@@ -59,6 +59,7 @@ class ReviewViewModel @Inject constructor(
     fun start(today: LocalDate = LocalDate.now()) {
         viewModelScope.launch {
             try {
+                collected.clear()                            // ← NEW
                 queue = repo.generateDailyQueue(targetGoal, today)
                 questions = buildQuestions(queue)
                 _ui.value = ReviewUi(stage = ReviewUi.Stage.InProgress, total = questions.size, index = 0, current = questions.getOrNull(0))
@@ -84,16 +85,30 @@ class ReviewViewModel @Inject constructor(
 
             when (mode) {
                 QuizMode.MCQ -> {
-                    val distractors = repo.randomDefinitionsExcept(id, 3).ifEmpty { listOf("An unrelated meaning A", "An unrelated meaning B", "An unrelated meaning C") }
+                    val distractors = repo.randomDefinitionsExcept(id, 3).ifEmpty { listOf("Unrelated meaning A", "Unrelated meaning B", "Unrelated meaning C") }
                     val options = (distractors + def).shuffled(Random(System.nanoTime()))
                     val correctIndex = options.indexOf(def).coerceAtLeast(0)
-                    out += Question.MCQ(id, prompt = "Pick the correct definition for: $term", options = options, correctIndex = correctIndex)
+                    out += Question.MCQ(
+                        id,
+                        prompt = "Pick the correct definition for: $term",
+                        options = options,
+                        correctIndex = correctIndex,
+                        correctText = def
+                    )
                 }
                 QuizMode.TYPE -> {
-                    out += Question.TYPE(id, prompt = "Type the word for this definition:\n$def")
+                    out += Question.TYPE(
+                        id,
+                        prompt = "Type the word for this definition:\n$def",
+                        correctText = term
+                    )
                 }
                 QuizMode.CLOZE -> {
-                    out += Question.CLOZE(id, prompt = sentence.replace(term, "____", ignoreCase = true))
+                    out += Question.CLOZE(
+                        id,
+                        prompt = sentence.replace(term, "____", ignoreCase = true),
+                        correctText = term
+                    )
                 }
             }
         }
@@ -103,41 +118,42 @@ class ReviewViewModel @Inject constructor(
     fun answerMcq(chosenIndex: Int) {
         val q = ui.value.current as? Question.MCQ ?: return
         val correct = (chosenIndex == q.correctIndex)
-        recordAndAdvance(q.wordId, mode = "MCQ", correct = correct, grade = if (correct) 5 else 2)
+        val user = q.options.getOrNull(chosenIndex) ?: ""
+        recordAndAdvance(q.wordId, mode = QuizMode.MCQ, correct = correct, grade = if (correct) 5 else 2, userAnswer = user, correctAnswer = q.correctText)
     }
 
     fun answerType(input: String) {
         val q = ui.value.current as? Question.TYPE ?: return
-        evaluateTypedAnswer(q.wordId, input, q.prompt, mode = "TYPE")
+        val correct = normalized(input) == normalized(q.correctText)
+        recordAndAdvance(q.wordId, mode = QuizMode.TYPE, correct = correct, grade = if (correct) 5 else 2, userAnswer = input, correctAnswer = q.correctText)
     }
 
     fun answerCloze(input: String) {
         val q = ui.value.current as? Question.CLOZE ?: return
-        evaluateTypedAnswer(q.wordId, input, q.prompt, mode = "CLOZE")
-    }
-
-    private fun evaluateTypedAnswer(wordId: Long, input: String, /*unused*/prompt: String, mode: String) {
-        viewModelScope.launch {
-            val details = repo.getDetails(wordId)
-            val target = details?.word?.term ?: ""
-            val correct = normalized(input) == normalized(target)
-            recordAndAdvance(wordId, mode, correct, grade = if (correct) 5 else 2)
-        }
+        val correct = normalized(input) == normalized(q.correctText)
+        recordAndAdvance(q.wordId, mode = QuizMode.CLOZE, correct = correct, grade = if (correct) 5 else 2, userAnswer = input, correctAnswer = q.correctText)
     }
 
     private fun normalized(s: String) = s.trim().lowercase()
 
-    private fun recordAndAdvance(wordId: Long, mode: String, correct: Boolean, grade: Int) {
+    private fun recordAndAdvance(
+        wordId: Long,
+        mode: QuizMode,
+        correct: Boolean,
+        grade: Int,
+        userAnswer: String,
+        correctAnswer: String
+    ) {
         viewModelScope.launch {
             val now = System.currentTimeMillis()
             val elapsed = now - questionStartMs
             questionStartMs = now
 
-            // Persist result + advance SRS
+            // 1) persist SRS result
             runCatching {
                 repo.recordReview(
                     wordId = wordId,
-                    mode = mode,
+                    mode = mode.name,
                     correct = correct,
                     timeMs = elapsed,
                     grade = grade,
@@ -145,7 +161,19 @@ class ReviewViewModel @Inject constructor(
                 )
             }
 
-            // Advance UI
+            // 2) collect for summary
+            val row = AnswerRow(
+                index = ui.value.index + 1,
+                mode = mode,
+                prompt = ui.value.current?.prompt.orEmpty(),
+                userAnswer = userAnswer,
+                correctAnswer = correctAnswer,
+                correct = correct,
+                timeMs = elapsed
+            )
+            collected += row
+
+            // 3) advance UI
             val nextIndex = ui.value.index + 1
             val newCorrect = ui.value.correctCount + if (correct) 1 else 0
             if (nextIndex >= questions.size) {
@@ -154,7 +182,8 @@ class ReviewViewModel @Inject constructor(
                     index = questions.size,
                     current = null,
                     correctCount = newCorrect,
-                    elapsedMs = ui.value.elapsedMs + elapsed
+                    elapsedMs = ui.value.elapsedMs + elapsed,
+                    summary = collected.toList()
                 )
             } else {
                 _ui.value = ui.value.copy(
@@ -171,5 +200,6 @@ class ReviewViewModel @Inject constructor(
         _ui.value = ReviewUi()
         queue = emptyList()
         questions = emptyList()
+        collected.clear()
     }
 }

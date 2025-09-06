@@ -1,9 +1,12 @@
 package com.keephub.app.ui.screens
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -63,15 +66,52 @@ private fun InProgressView(modifier: Modifier, ui: ReviewUi, vm: ReviewViewModel
 private fun SummaryView(modifier: Modifier, ui: ReviewUi, onRestart: () -> Unit) {
     val minutes = TimeUnit.MILLISECONDS.toMinutes(ui.elapsedMs)
     val seconds = TimeUnit.MILLISECONDS.toSeconds(ui.elapsedMs) % 60
-    Column(modifier.fillMaxSize().padding(24.dp)) {
+
+    Column(modifier.fillMaxSize().padding(16.dp)) {
         Text("All done!", style = MaterialTheme.typography.titleLarge)
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(6.dp))
         Text("Score: ${ui.correctCount}/${ui.total}")
         Text("Time: ${minutes}m ${seconds}s")
-        Spacer(Modifier.height(20.dp))
-        Button(onClick = onRestart) { Text("Restart") }
+        Spacer(Modifier.height(16.dp))
+
+        if (ui.summary.isNotEmpty()) {
+            Text("Answer review", style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(8.dp))
+            HorizontalDivider(Modifier, DividerDefaults.Thickness, DividerDefaults.color)
+            Spacer(Modifier.height(8.dp))
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.weight(1f, fill = true)) {
+                items(items = ui.summary, key = { answerRow -> answerRow.index}){row -> SummaryRow(row) }
+            }
+        } else {
+            Text("No questions answered.", color = MaterialTheme.colorScheme.secondary)
+        }
+
+        Spacer(Modifier.height(12.dp))
+        Button(onClick = onRestart, modifier = Modifier.fillMaxWidth()) { Text("Restart") }
     }
 }
+
+@Composable
+private fun SummaryRow(row: AnswerRow) {
+    val badge = if (row.correct) "✓" else "✗"
+    val badgeColor = if (row.correct) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+
+    Card {
+        Column(Modifier.fillMaxWidth().padding(12.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("${row.index}. ${row.mode}", style = MaterialTheme.typography.labelLarge)
+                Text(badge, color = badgeColor, style = MaterialTheme.typography.labelLarge)
+            }
+            Spacer(Modifier.height(6.dp))
+            Text(row.prompt, style = MaterialTheme.typography.bodyMedium)
+            Spacer(Modifier.height(6.dp))
+            Text("Your answer: ${row.userAnswer.ifBlank { "—" }}", style = MaterialTheme.typography.bodyMedium)
+            Text("Correct answer: ${row.correctAnswer}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.secondary)
+        }
+    }
+}
+
 
 @Composable
 private fun McqCard(q: Question.MCQ, onChoose: (Int) -> Unit) {
