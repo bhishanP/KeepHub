@@ -30,6 +30,10 @@ object NetworkModule {
         FreeDictionaryApiService(client, baseUrl = BuildConfig.DICT_BASE_URL)
 
     @Provides @Singleton
+    fun geminiApiService(client: OkHttpClient): GeminiApiService =
+        GeminiApiService(client)
+
+    @Provides @Singleton
     fun translateService(client: OkHttpClient): TranslateService =
         if (!BuildConfig.ENABLE_TRANSLATION) {
             // No-op implementation: never called by repo when disabled, but safe fallback.

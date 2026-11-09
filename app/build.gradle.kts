@@ -19,7 +19,12 @@ android {
     }
     buildTypes { release { isMinifyEnabled = false } }
     buildFeatures { compose = true }
-    packaging { resources.excludes += "/META-INF/{AL2.0,LGPL2.1}" }
+    packaging {
+        resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        jniLibs {
+            useLegacyPackaging = false
+        }
+    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -40,15 +45,10 @@ dependencies {
     implementation(libs.androidx.ui)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.foundation)
-    implementation(libs.androidx.compose.ui.ui)
+    implementation(libs.androidx.material.icons.extended)
     debugImplementation(libs.androidx.ui.tooling)
-    androidTestImplementation(platform(libs.androidx.compose.bom))
 
-    implementation(libs.androidx.activity.compose.v192)
-    implementation(libs.material3)
-    implementation(libs.ui)
-    implementation(libs.ui.tooling.preview)
-    debugImplementation(libs.ui.tooling)
+    // Material Components for theme fallback
     implementation(libs.material)
 
     // Lifecycle + Navigation
@@ -61,21 +61,24 @@ dependencies {
     ksp(libs.hilt.android.compiler)
     implementation(libs.androidx.hilt.navigation.compose)
 
-    // WorkManager (Step 6 later)
+    // WorkManager
     implementation(libs.androidx.work.runtime.ktx)
 
-    // Coil (optional images later)
+    // DataStore Preferences
+    implementation(libs.androidx.datastore.preferences)
+
+    // Coil
     implementation(libs.coil.compose)
 
     // Desugaring
     coreLibraryDesugaring(libs.desugar.jdk.libs)
 
-    implementation(libs.androidx.material.icons.extended)
+    // Unit tests
+    testImplementation(libs.junit)
+    testImplementation(libs.truth)
 
     // UI tests
-    androidTestImplementation(platform(libs.androidx.compose.bom.v20241000))
+    androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.ui.test.junit4)
     debugImplementation(libs.androidx.ui.test.manifest)
-    implementation(libs.androidx.datastore.preferences.v111)
-
 }

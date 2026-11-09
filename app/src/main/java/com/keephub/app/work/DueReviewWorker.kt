@@ -47,31 +47,44 @@ class DueReviewWorker(
             ReviewNotification.show(ctx, ids.size)
         }
 
-        // Schedule the next run for the chosen hour
+        // Schedule the next run for the chosen hour (guaranteed next day)
         val hour = settings.notifyHour.first()          // e.g., 19
-        enqueueForHour(ctx, hour)
+        scheduleDailyReminder(ctx, hour, policy = ExistingWorkPolicy.REPLACE, forceNextDay = true)
 
         return Result.success()
     }
 
     companion object {
-        private const val UNIQUE_NAME = "keephub_due_review"
+        const val UNIQUE_NAME = "keephub_due_review"
 
-        fun enqueueForHour(ctx: Context, hour24: Int) {
-            val delayMs = computeDelayMs(hour24)
+        fun scheduleDailyReminder(
+            ctx: Context,
+            hour24: Int,
+            policy: ExistingWorkPolicy = ExistingWorkPolicy.REPLACE,
+            forceNextDay: Boolean = false
+        ) {
+            val delayMs = computeDelayMs(hour24, forceNextDay)
             val req = OneTimeWorkRequestBuilder<DueReviewWorker>()
                 .setInitialDelay(delayMs, TimeUnit.MILLISECONDS)
                 .build()
             WorkManager.getInstance(ctx)
-                .enqueueUniqueWork(UNIQUE_NAME, ExistingWorkPolicy.REPLACE, req)
+                .enqueueUniqueWork(UNIQUE_NAME, policy, req)
         }
 
-        private fun computeDelayMs(hour24: Int): Long {
-            val zone = ZoneId.systemDefault()
-            val now = ZonedDateTime.now(zone)
+        fun computeDelayMs(
+            hour24: Int,
+            forceNextDay: Boolean = false,
+            now: ZonedDateTime = ZonedDateTime.now(ZoneId.systemDefault())
+        ): Long {
             var next = now.withHour(hour24.coerceIn(0, 23)).withMinute(0).withSecond(0).withNano(0)
-            if (!next.isAfter(now)) next = next.plusDays(1)
-            return Duration.between(now, next).toMillis()
+            if (forceNextDay || !next.isAfter(now.plusMinutes(2))) {
+                next = next.plusDays(1)
+            }
+            return Duration.between(now, next).toMillis().coerceAtLeast(0)
+        }
+
+        fun enqueueForHour(ctx: Context, hour24: Int) {
+            scheduleDailyReminder(ctx, hour24, ExistingWorkPolicy.REPLACE, forceNextDay = false)
         }
     }
 }

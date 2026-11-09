@@ -3,8 +3,11 @@ package com.keephub.core.data.repo
 import android.util.Log
 import com.keephub.core.data.db.dao.*
 import com.keephub.core.data.db.entity.*
+import com.keephub.core.data.net.GeminiApiService
+import com.keephub.core.data.settings.SettingsStore
 import com.keephub.core.data.util.WordNormalizer
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -31,10 +34,13 @@ interface WordRepository {
         tags: List<String>
     ): AddWordResult
 
-    suspend fun ensureEnriched(wordId: Long, targetLang: String): Boolean
+    suspend fun ensureEnriched(wordId: Long, targetLang: String, forceRefresh: Boolean = false): Boolean
 
     /** Returns word IDs to review today, preferring due items then filling with new words. */
     suspend fun generateDailyQueue(targetSize: Int, today: LocalDate): List<Long>
+
+    /** Returns random word IDs for practice review regardless of due date. */
+    suspend fun generatePracticeQueue(limit: Int): List<Long>
 
     /** Applies a review grade (0..5) and records QuizResult. Returns the new SRS state. */
     suspend fun recordReview(wordId: Long, mode: String, correct: Boolean, timeMs: Long, grade: Int, today: LocalDate): SrsStateEntity
@@ -43,6 +49,14 @@ interface WordRepository {
     suspend fun getDetails(wordId: Long): WordWithDetails?
     suspend fun randomDefinitionsExcept(wordId: Long, count: Int): List<String>
     suspend fun randomTermsExcept(wordId: Long, count: Int): List<String>
+
+    suspend fun findSimilarWords(term: String, limit: Int = 3): List<WordEntity>
+    suspend fun mergeWord(existingId: Long, newNotes: String?, newTags: List<String>): Boolean
+
+    fun observeReviewTimestamps(): Flow<List<Instant>>
+    fun observeDifficultWordIds(): Flow<List<Long>>
+
+    suspend fun resetAllReviews(): Boolean
 
     suspend fun deleteWord(wordId: Long): Boolean
 }
@@ -54,6 +68,8 @@ class WordRepositoryImpl @Inject constructor(
     private val translationDao: TranslationDao,
     private val normalizer: WordNormalizer,
     private val dict: DictionaryService,
+    private val gemini: GeminiApiService,
+    private val settings: SettingsStore,
     private val translator: TranslateService,
     private val srsDao: SrsDao,
     private val quizResultDao: QuizResultDao
@@ -61,48 +77,130 @@ class WordRepositoryImpl @Inject constructor(
 
     override fun observeAll() = wordDao.observeAll()
     override fun observeWord(id: Long) = wordDao.observeWord(id)
-    override suspend fun checkDuplicateForTerm(term: String) =
-        wordDao.findByNormalized(normalizer.normalizeForKey(term))
+    override fun observeReviewTimestamps(): Flow<List<Instant>> = quizResultDao.observeReviewTimestamps()
+    override fun observeDifficultWordIds(): Flow<List<Long>> = srsDao.observeDifficultWordIds()
+
+    override suspend fun checkDuplicateForTerm(term: String): WordEntity? {
+        val candidates = normalizer.candidateKeys(term)
+        if (candidates.isEmpty()) return null
+        return wordDao.findByNormalizedIn(candidates)
+    }
+
+    override suspend fun findSimilarWords(term: String, limit: Int): List<WordEntity> {
+        val normalized = normalizer.normalizeForKey(term)
+        if (normalized.length < 2) return emptyList()
+        val prefix = normalized.take(4)
+        return wordDao.findSimilar(prefix, limit)
+            .filter { it.normalizedTerm != normalized }
+    }
+
+    override suspend fun mergeWord(existingId: Long, newNotes: String?, newTags: List<String>): Boolean = withContext(Dispatchers.IO) {
+        val existing = wordDao.findById(existingId) ?: return@withContext false
+        val mergedTags = (existing.tags + newTags.filter { it.isNotBlank() }.map { it.trim() }).distinct()
+        val mergedNotes = when {
+            existing.notes.isNullOrBlank() -> newNotes?.ifBlank { null }
+            newNotes.isNullOrBlank() -> existing.notes
+            newNotes.trim().let { existing.notes.contains(it) } -> existing.notes
+            else -> "${existing.notes}\n\n${newNotes.trim()}"
+        }
+        wordDao.update(
+            existing.copy(
+                tags = mergedTags,
+                notes = mergedNotes,
+                updatedAt = Instant.now()
+            )
+        )
+        true
+    }
 
     override suspend fun addWord(term: String, baseLang: String, notes: String?, tags: List<String>): AddWordResult {
-        val normalized = normalizer.normalizeForKey(term)
-        val existing = wordDao.findByNormalized(normalized)
+        val trimmed = term.trim()
+        if (trimmed.isBlank()) return AddWordResult.Duplicate(-1)
+        val existing = checkDuplicateForTerm(trimmed)
         if (existing != null) return AddWordResult.Duplicate(existing.id)
+
+        val normalized = normalizer.normalizeForKey(trimmed)
         val now = Instant.now()
         val id = wordDao.insert(
             WordEntity(
-                term = term.trim(),
+                term = trimmed,
                 normalizedTerm = normalized,
                 baseLang = baseLang,
                 notes = notes?.ifBlank { null },
-                tags = tags.filter { it.isNotBlank() }.map { it.trim() },
-                createdAt = now, updatedAt = now
+                tags = tags.filter { it.isNotBlank() }.map { it.trim() }.distinct(),
+                createdAt = now,
+                updatedAt = now
             )
         )
         return AddWordResult.Success(id)
     }
 
-    override suspend fun ensureEnriched(wordId: Long, targetLang: String): Boolean = withContext(Dispatchers.IO) {
+    override suspend fun ensureEnriched(wordId: Long, targetLang: String, forceRefresh: Boolean): Boolean = withContext(Dispatchers.IO) {
         val word = wordDao.findById(wordId) ?: return@withContext false
         var changed = false
-        // dictionary
+
+        if (forceRefresh) {
+            senseDao.deleteByWord(wordId)
+        }
+
+        // dictionary / AI enrichment
         if (senseDao.countForWord(wordId) == 0) {
-            val look = runCatching { dict.lookup(word.term, word.baseLang) }.getOrNull()
-            if (look != null && look.senses.isNotEmpty()) {
-                val senses = look.senses.map {
-                    SenseEntity(
-                        wordId = wordId,
-                        pos = it.pos,
-                        definition = it.definition,
-                        ipa = it.ipa ?: look.ipa,
-                        examples = it.examples,
-                        synonyms = it.synonyms,
-                        antonyms = it.antonyms,
-                        audioUrls = it.audioUrls
+            val geminiKey = runCatching { settings.geminiApiKey.first() }.getOrDefault("")
+            var enrichedWithAi = false
+
+            // Tier 1: Gemini AI enrichment if BYOK key is configured
+            if (geminiKey.isNotBlank()) {
+                val aiResult = runCatching {
+                    gemini.enrichWord(
+                        apiKey = geminiKey,
+                        term = word.term,
+                        contextSentence = word.notes,
+                        baseLang = word.baseLang
                     )
+                }.getOrNull()
+
+                if (aiResult != null && aiResult.lookup.senses.isNotEmpty()) {
+                    val senses = aiResult.lookup.senses.map {
+                        SenseEntity(
+                            wordId = wordId,
+                            pos = it.pos,
+                            definition = it.definition,
+                            ipa = it.ipa,
+                            examples = it.examples,
+                            synonyms = it.synonyms,
+                            antonyms = it.antonyms,
+                            audioUrls = emptyList()
+                        )
+                    }
+                    senseDao.insertAll(senses)
+
+                    if (word.notes.isNullOrBlank() && !aiResult.mnemonic.isNullOrBlank()) {
+                        wordDao.update(word.copy(notes = "💡 Mnemonic: ${aiResult.mnemonic}", updatedAt = Instant.now()))
+                    }
+                    changed = true
+                    enrichedWithAi = true
                 }
-                senseDao.insertAll(senses)
-                changed = true
+            }
+
+            // Tier 2: Standard FreeDictionaryApi fallback
+            if (!enrichedWithAi) {
+                val look = runCatching { dict.lookup(word.term, word.baseLang) }.getOrNull()
+                if (look != null && look.senses.isNotEmpty()) {
+                    val senses = look.senses.map {
+                        SenseEntity(
+                            wordId = wordId,
+                            pos = it.pos,
+                            definition = it.definition,
+                            ipa = it.ipa ?: look.ipa,
+                            examples = it.examples,
+                            synonyms = it.synonyms,
+                            antonyms = it.antonyms,
+                            audioUrls = it.audioUrls
+                        )
+                    }
+                    senseDao.insertAll(senses)
+                    changed = true
+                }
             }
         }
         // translation
@@ -127,6 +225,10 @@ class WordRepositoryImpl @Inject constructor(
         val remaining = targetSize - due.size
         val newOnes = wordDao.newWords(remaining).map { it.id }
         return@withContext (due + newOnes)
+    }
+
+    override suspend fun generatePracticeQueue(limit: Int): List<Long> = withContext(Dispatchers.IO) {
+        wordDao.randomWordIds(limit)
     }
 
     override suspend fun recordReview(
@@ -169,6 +271,12 @@ class WordRepositoryImpl @Inject constructor(
         translationDao.deleteByWord(wordId)
         val rows = wordDao.delete(wordId)
         rows > 0
+    }
+
+    override suspend fun resetAllReviews(): Boolean = withContext(Dispatchers.IO) {
+        srsDao.clearAll()
+        quizResultDao.clearAll()
+        true
     }
 }
 

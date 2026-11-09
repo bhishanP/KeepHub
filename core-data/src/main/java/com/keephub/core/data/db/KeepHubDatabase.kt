@@ -11,7 +11,7 @@ import com.keephub.core.data.db.typeconverters.Converters
 
 @Database(
     version = 2,
-    exportSchema = true,
+    exportSchema = false,
     entities = [
         WordEntity::class, SenseEntity::class, TranslationEntity::class,
         SrsStateEntity::class, QuizResultEntity::class

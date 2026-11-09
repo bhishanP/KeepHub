@@ -55,7 +55,7 @@ dependencies {
     coreLibraryDesugaring(libs.desugar.jdk.libs)
 
     // AndroidX
-    implementation(libs.androidx.core.ktx.v1131)
+    implementation(libs.androidx.core.ktx)
 
     implementation(libs.okhttp)
     implementation(libs.logging.interceptor)

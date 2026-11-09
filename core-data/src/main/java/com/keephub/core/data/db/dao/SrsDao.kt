@@ -2,6 +2,7 @@ package com.keephub.core.data.db.dao
 
 import androidx.room.*
 import com.keephub.core.data.db.entity.SrsStateEntity
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface SrsDao {
@@ -16,4 +17,10 @@ interface SrsDao {
 
     @Query("DELETE FROM srs_state WHERE wordId = :wordId")
     suspend fun deleteByWord(wordId: Long)
+
+    @Query("SELECT wordId FROM srs_state WHERE lapses > 0")
+    fun observeDifficultWordIds(): Flow<List<Long>>
+
+    @Query("DELETE FROM srs_state")
+    suspend fun clearAll()
 }

@@ -28,6 +28,18 @@ interface WordDao {
     @Query("SELECT * FROM words WHERE normalizedTerm = :normalized LIMIT 1")
     suspend fun findByNormalized(normalized: String): WordEntity?
 
+    @Query("SELECT * FROM words WHERE normalizedTerm IN (:candidates) LIMIT 1")
+    suspend fun findByNormalizedIn(candidates: List<String>): WordEntity?
+
+    @Query("""
+        SELECT * FROM words 
+        WHERE normalizedTerm LIKE :prefix || '%' 
+           OR term LIKE :prefix || '%' 
+        ORDER BY term ASC 
+        LIMIT :limit
+    """)
+    suspend fun findSimilar(prefix: String, limit: Int = 3): List<WordEntity>
+
     @Query("SELECT * FROM words WHERE id = :id")
     suspend fun findById(id: Long): WordEntity?
 
@@ -45,6 +57,8 @@ interface WordDao {
     @Query("SELECT term FROM words WHERE id != :excludeWordId ORDER BY RANDOM() LIMIT :limit")
     suspend fun randomTerms(excludeWordId: Long, limit: Int): List<String>
 
+    @Query("SELECT id FROM words ORDER BY RANDOM() LIMIT :limit")
+    suspend fun randomWordIds(limit: Int): List<Long>
 }
 data class WordWithDetails(
     @Embedded val word: WordEntity,

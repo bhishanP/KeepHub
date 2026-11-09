@@ -16,7 +16,11 @@ object Routes {
 }
 
 @Composable
-fun KeepHubNavHost(startPrefill: String? = null, startToReview: Boolean) {
+fun KeepHubNavHost(
+    startPrefill: String? = null,
+    startToReview: Boolean,
+    onReviewNavigated: () -> Unit = {}
+) {
     val nav = rememberNavController()
     val startDest = Routes.WORD_LIST
     LaunchedEffect(startToReview) {
@@ -24,6 +28,7 @@ fun KeepHubNavHost(startPrefill: String? = null, startToReview: Boolean) {
             // Wait one frame so the NavHost is ready
             kotlinx.coroutines.yield()
             nav.navigate(Routes.REVIEW)
+            onReviewNavigated()
         }
     }
     NavHost(navController = nav, startDestination = startDest) {
@@ -57,7 +62,7 @@ fun KeepHubNavHost(startPrefill: String? = null, startToReview: Boolean) {
             WordDetailScreen(id = id, onBack = { nav.popBackStack() })
         }
 
-        composable(Routes.REVIEW) { ReviewScreen() }
-        composable(Routes.SETTINGS) { SettingsScreen() }
+        composable(Routes.REVIEW) { ReviewScreen(onBack = { nav.popBackStack() }) }
+        composable(Routes.SETTINGS) { SettingsScreen(onBack = { nav.popBackStack() }) }
     }
 }

@@ -3,6 +3,7 @@ package com.keephub.app.ui.screens
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.keephub.core.data.db.entity.WordEntity
 import com.keephub.core.data.repo.AddWordResult
 import com.keephub.core.data.repo.WordRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -19,8 +20,10 @@ data class AddUiState(
     val termField: String = "",
     val tagsField: String = "",
     val notesField: String = "",
-    val duplicateId: Long? = null,
-    val canSave: Boolean = false
+    val duplicateWord: WordEntity? = null,
+    val similarWords: List<WordEntity> = emptyList(),
+    val canSave: Boolean = false,
+    val isMerging: Boolean = false
 )
 
 @HiltViewModel
@@ -51,10 +54,21 @@ class AddWordViewModel @Inject constructor(
 
     private fun checkDuplicateDebounced(term: String) {
         debounceJob?.cancel()
+        val trimmed = term.trim()
+        if (trimmed.isBlank()) {
+            _ui.update { it.copy(duplicateWord = null, similarWords = emptyList()) }
+            return
+        }
+
         debounceJob = viewModelScope.launch {
-            delay(200)
-            val existing = repo.checkDuplicateForTerm(term)
-            _ui.update { it.copy(duplicateId = existing?.id) }
+            delay(150)
+            val existing = repo.checkDuplicateForTerm(trimmed)
+            val similar = if (existing == null && trimmed.length >= 3) {
+                repo.findSimilarWords(trimmed)
+            } else {
+                emptyList()
+            }
+            _ui.update { it.copy(duplicateWord = existing, similarWords = similar) }
         }
     }
 
@@ -64,12 +78,41 @@ class AddWordViewModel @Inject constructor(
         if (term.isBlank()) return
 
         viewModelScope.launch {
-            val tags = state.tagsField.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+            // Immediate check before insert (guards against fast typing race conditions)
+            val existing = repo.checkDuplicateForTerm(term)
+            if (existing != null) {
+                _ui.update { it.copy(duplicateWord = existing) }
+                return@launch
+            }
+
+            val tags = parseTags(state.tagsField)
             val notes = state.notesField.ifBlank { null }
             when (val res = repo.addWord(term = term, notes = notes, tags = tags)) {
                 is AddWordResult.Success -> onSaved(res.id)
-                is AddWordResult.Duplicate -> _ui.update { it.copy(duplicateId = res.existingId) }
+                is AddWordResult.Duplicate -> {
+                    val dupWord = repo.checkDuplicateForTerm(term)
+                    _ui.update { it.copy(duplicateWord = dupWord) }
+                }
             }
         }
     }
+
+    fun mergeIntoExisting(onMerged: (Long) -> Unit) {
+        val state = _ui.value
+        val existing = state.duplicateWord ?: return
+        val tags = parseTags(state.tagsField)
+        val notes = state.notesField.ifBlank { null }
+
+        _ui.update { it.copy(isMerging = true) }
+        viewModelScope.launch {
+            val success = repo.mergeWord(existing.id, newNotes = notes, newTags = tags)
+            _ui.update { it.copy(isMerging = false) }
+            if (success) {
+                onMerged(existing.id)
+            }
+        }
+    }
+
+    private fun parseTags(raw: String): List<String> =
+        raw.split(",").map { it.trim() }.filter { it.isNotEmpty() }.distinct()
 }
