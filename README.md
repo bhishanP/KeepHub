@@ -1,273 +1,166 @@
-# KeepHub — Android vocab app (Kotlin + Compose)
+# KeepHub — Android Vocabulary & Spaced Repetition App
 
-KeepHub helps English-proficiency exam takers **grow and retain vocabulary**. Add words fast, see clean details (definitions, IPA, examples, audio), and review them with **spaced repetition** + **daily reminders**. Runs offline with cached data and mock services.
+KeepHub helps English-proficiency exam takers and lifelong language learners **grow, retain, and master vocabulary**. Add words quickly, explore rich context-aware definitions, listen to phonetics audio, and retain words forever using **scientific spaced repetition (SM-2)**, **daily smart reminders**, and **Google Gemini AI integration (BYOK)**.
+
+The app is **100% offline-first**: all core functionalities, local Room caching, and spaced repetition quizzes run flawlessly with or without an internet connection or AI key.
 
 ---
 
 ## ✨ Features
 
-* **Add words fast**
+### 🧠 Google Gemini AI Integration (Bring Your Own Key)
+* **Zero-Cost BYOK Architecture**: Add your free Google AI Studio key (`aistudio.google.com`) directly in Settings.
+* **Current Flash Endpoints with Auto-Discovery**: Targets Google's recommended models (`gemini-3.5-flash-lite`, `gemini-3.8-flash`, `gemini-3.6-flash`, `gemini-flash-latest`) with automatic fallback.
+* **3-Tier Offline-First Fallback**:
+  * **Tier 1**: Google Gemini AI (rich context-aware definitions, natural examples, mnemonics).
+  * **Tier 2**: Free Dictionary API (definitions, phonetics audio, synonyms/antonyms).
+  * **Tier 3**: Local Room SQLite cache (instant, zero network required).
+* **Context-Aware Enrichment**: When adding a word from a reading passage or sentence, Gemini prioritizes the specific sense intended in that context.
+* **AI Memory Anchors**: Generates high-retention 1-sentence mnemonics or etymology anchors displayed in Word Details.
+* **"Explain My Mistake" Interactive Tutor**: Tap on any incorrect quiz card to get a friendly 2–3 sentence explanation comparing your answer with the target word.
+* **Smart Semantic & Typo Grading**: Accepts legitimate synonyms and tolerates minor typos (Levenshtein distance + semantic AI grading) during Type and Cloze quizzes.
+* **AI Vocabulary Micro-Stories**: Generates a 120-word cohesive story naturally featuring your reviewed words, with target vocabulary highlighted in bold and primary theme color.
 
-    * Manual entry + Share Intent prefill
-    * Duplicate prevention (case/diacritics & basic inflection normalization)
-    * Tags & notes
-* **Word details**
+### 📝 Vocabulary Management & Dictionary
+* **Fast Word Addition**: Manual entry or 1-tap **Android Share Sheet / Process Text** prefill from any browser or reading app.
+* **Duplicate Detection**: Normalizes diacritics, case, and basic inflection to prevent duplicate entries while offering 1-tap notes/tags merging.
+* **Word Details**: Parts of speech, IPA phonetic transcriptions, definitions, natural examples, synonyms/antonyms.
+* **Pronunciation Audio**: High-fidelity phonetic audio playback using Android `MediaPlayer` and system TTS fallback.
+* **Tags & Personal Notes**: Organize words by exam (e.g. *GRE*, *TOEFL*, *IELTS*) or custom categories.
 
-    * Meanings, POS, **IPA**, examples, synonyms/antonyms
-    * **Pronunciation audio** (Free Dictionary API phonetics)
-    * Offline caching; **Refresh** button
-* **Spaced repetition**
+### 🔁 Spaced Repetition System (SRS)
+* **SuperMemo SM-2 Algorithm**: Dynamically calculates `easiness`, `intervalDays`, `repetitions`, `lapses`, and `dueDate`.
+* **Daily Review Queue**: Automatically queues due cards and fills up to your configured daily goal with new words.
+* **4 Interactive Quiz Modes**:
+  1. **Multiple Choice (MCQ)**: Smart contextual distractors selected from matching parts of speech.
+  2. **Typing**: Spell out the headword from memory with smart letter clues and semantic grading.
+  3. **Cloze (Fill-in-the-blank)**: Deduce and type the missing word from a natural example sentence.
+  4. **Audio**: Listen to the native pronunciation and match the correct meaning.
+* **Session Summary**: Visual review score, duration, accuracy breakdown, and 1-tap AI Story generation.
 
-    * **SM-2** scheduler (`easiness`, `intervalDays`, `repetitions`, `dueDate`, `lapses`, `history`)
-    * Daily review queue (fills with “new” words if under goal)
-    * Quizzes: **MCQ**, **Type**, **Cloze**
-    * Results recorded to Room
-* **Reminders**
+### 🔔 Daily Reminders & Background Work
+* **WorkManager Scheduled Worker**: Checks due cards and schedules notifications at your configured reminder hour.
+* **Streak Protection**: Reschedules daily reminders safely with `ExistingWorkPolicy.KEEP` so app opens never clobber active alarms.
+* **Instant In-App Test**: "Send Test" button in Settings lets you preview notifications and verify Android notification channels instantly.
+* **Deep Linking**: Tapping the notification opens today's Review session immediately.
 
-    * WorkManager daily job + local notification
-    * Deep-links directly to today’s Review
-* **Settings**
-
-    * Daily goal, quiz type toggles, reminder time (24h)
-    * Translation language (feature can be disabled via flag)
-* **Polish & A11y**
-
-    * Material 3, large touch targets, TalkBack labels
-    * Empty/error/loading states; shimmer placeholders
-    * Scrollable details view; RTL & dynamic text friendly
-* **Manage words**
-
-    * Delete with confirmation (removes all linked data)
-
----
-
-## 🧱 Tech & Architecture
-
-* **Language/UI:** Kotlin, Jetpack Compose (Material 3)
-* **Architecture:** MVVM + Repository; Hilt (DI)
-* **Async:** Kotlin Coroutines + Flow
-* **Persistence:** Room (offline-first), DataStore (settings)
-* **Background:** WorkManager + Notification API
-* **Networking:** OkHttp (optional real clients), mock services default
-
-**Android:** minSdk 24, compile/target SDK latest supported by your AGP
-**JDK:** 17
+### 🎨 Material Design 3 (M3) UI & Polish
+* **Dynamic Theming & Dark Mode**: Full M3 color system support with system-matched dynamic palettes.
+* **Tactile Steppers & Quick Presets**: Increment/decrement buttons (`[-]` / `[+]`) and 1-tap chips for Daily Goals (`5`, `10`, `20`, `30`, `50`) and Reminder Times (`Morning 08:00`, `Noon 12:00`, `Evening 18:00`, `Night 21:00`).
+* **Adaptive Keyboard Handling**: Comprehensive `Modifier.imePadding()` and `BringIntoViewRequester` integration ensures text editors and action buttons are never obscured by the software keyboard.
+* **Native Markdown Formatting**: In-app `MarkdownText` engine strips raw `**` delimiters and renders bold spans with theme accents.
 
 ---
 
-## 🗂️ Project structure
+## 🧱 Architecture & Tech Stack
 
 ```
 KeepHub/
-├─ app/                         # UI, nav, workers, notifications
+├─ app/                         # Presentation Layer & Background Tasks
 │  ├─ src/main/java/com/keephub/app/
-│  │  ├─ MainActivity.kt
-│  │  ├─ KeepHubApp.kt          # Hilt Application + initial scheduling
-│  │  ├─ nav/NavGraph.kt
-│  │  ├─ notifications/ReviewNotification.kt
-│  │  ├─ work/DueReviewWorker.kt
-│  │  ├─ ui/components/States.kt
-│  │  ├─ ui/screens/
-│  │  │  ├─ WordListScreen.kt
-│  │  │  ├─ AddWordScreen.kt
-│  │  │  ├─ WordDetailScreen.kt  # audio chips + delete confirm
-│  │  │  ├─ ReviewScreen.kt      # MCQ / Type / Cloze
-│  │  │  └─ ReviewAndSettings.kt # Settings screen
-│  │  └─ ui/review/              # Question models + VM
-│  └─ src/main/res/              # Adaptive icon, theme, strings
-└─ core-data/                    # Room, repos, services, settings
-   ├─ db/                        # Entities, DAOs, AppDatabase (+ migrations)
-   ├─ repo/                      # WordRepository (+ SRS, enrich, delete)
-   ├─ srs/                       # SM-2 engine + tests
-   ├─ net/                       # Mock + real services
-   ├─ di/                        # Hilt modules (DB/Network/Repo)
-   └─ settings/                  # DataStore SettingsStore
+│  │  ├─ MainActivity.kt        # Edge-to-edge entry point + notification permissions
+│  │  ├─ KeepHubApp.kt          # Hilt Application container + initial schedule
+│  │  ├─ nav/NavGraph.kt        # Compose Navigation destinations
+│  │  ├─ notifications/         # Notification channels & builder
+│  │  ├─ work/                  # WorkManager DueReviewWorker
+│  │  ├─ ui/
+│  │  │  ├─ components/         # States, Shimmer placeholders, MarkdownText
+│  │  │  ├─ review/             # Quiz generation, ReviewViewModel, SM-2 bridge
+│  │  │  ├─ screens/            # WordList, AddWord, WordDetail, Review, Settings
+│  │  │  └─ theme/              # Material 3 Color schemes, Typography, Shapes
+│  │  └─ res/                   # Adaptive icons, vectors, notification drawables
+│  └─ src/test/                 # Worker tests, Streak tests, Markdown tests
+└─ core-data/                   # Domain & Data Layer (Pure Kotlin + Android Library)
+   ├─ src/main/java/com/keephub/core/data/
+   │  ├─ db/                    # Room Database, TypeConverters, Entities, DAOs
+   │  ├─ di/                    # Hilt dependency injection modules
+   │  ├─ net/                   # GeminiApiService (REST), FreeDictionaryApiService
+   │  ├─ repo/                  # WordRepository (3-tier fallback), DictionaryService
+   │  ├─ settings/              # DataStore Preferences (SettingsStore)
+   │  ├─ srs/                   # SuperMemo SM-2 calculation engine
+   │  └─ util/                  # WordNormalizer (Levenshtein, diacritics, inflections)
+   └─ src/test/                 # Unit tests for Gemini API, Normalizer, SM-2 engine
 ```
+
+* **UI Framework**: Jetpack Compose (Material 3), Navigation Compose
+* **Dependency Injection**: Hilt (Dagger)
+* **Database**: Room (SQLite) with schema migrations
+* **Preferences**: Jetpack DataStore (Preferences)
+* **Background Processing**: WorkManager
+* **Networking**: OkHttp, Kotlinx Serialization (`explicitNulls = false`)
+* **Target Environment**: minSdk 24, compileSdk 36, JDK 17 / 21
 
 ---
 
-## 🔧 Getting started
+## 🚀 Getting Started
 
-### 1) Requirements
+### Prerequisites
+* **Android Studio** (Koala | Ladybug or newer)
+* **JDK 17** or **JDK 21**
+* Android device or emulator running **Android 7.0 (API 24)** or higher
 
-* Android Studio (Koala+)
-* JDK 17
-* Android SDK + emulator or device (Android 7.0+)
-
-### 2) Build
-
+### Build & Run
 ```bash
+# Clone the repository
+git clone https://github.com/your-username/KeepHub.git
+cd KeepHub
+
+# Run all automated unit tests across :app and :core-data
+./gradlew testDebugUnitTest
+
+# Assemble debug APK
 ./gradlew assembleDebug
+
+# Install on connected device or emulator
+adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
 ---
 
-## ⚙️ Configuration & build flags
+## 🔑 Setting Up Gemini AI (Optional)
 
-All flags live in **`:core-data/build.gradle.kts`** via `buildConfigField`.
+KeepHub works 100% offline out-of-the-box using the Free Dictionary API and Room DB. To unlock AI features:
 
-| Flag                           |                           Default | What it does                                                                                                 |
-| ------------------------------ | --------------------------------: | ------------------------------------------------------------------------------------------------------------ |
-| `USE_MOCK` (boolean)           |                            `true` | Use **mock services** (offline-friendly). Set `false` to hit real endpoints.                                 |
-| `ENABLE_TRANSLATION` (boolean) |                           `false` | Toggle translation feature globally. When `false`, repo skips translation calls and UI can hide the section. |
-| `DICT_BASE_URL` (String)       | `"https://api.dictionaryapi.dev"` | Free Dictionary API base.                                                                                    |
-| `TRANSLATE_BASE_URL` (String)  |                              `""` | LibreTranslate-compatible API base (e.g., `"https://libretranslate.de"`).                                    |
-| `TRANSLATE_API_KEY` (String)   |                              `""` | Optional key for your translate server.                                                                      |
-
-> **Recommended dev setup:** keep `USE_MOCK = true` and `ENABLE_TRANSLATION = false`.
-> Flip `USE_MOCK = false` and set `TRANSLATE_BASE_URL` only when you want real network.
+1. Obtain a free Gemini API key from [Google AI Studio](https://aistudio.google.com).
+2. Open KeepHub &rarr; **Settings** &rarr; **Gemini AI (BYOK)**.
+3. Paste your API key and tap **Test Key**.
+4. KeepHub tests connectivity directly with active Flash endpoints (`gemini-3.5-flash-lite`, `gemini-3.8-flash`), displaying live diagnostics.
+5. Tap **Save**. Your key is securely stored in local private DataStore preferences.
 
 ---
 
-## 🗄️ Database & migrations
+## ⚙️ Build Configuration Flags
 
-Room entities (key tables):
+All flags are configured in [`core-data/build.gradle.kts`](core-data/build.gradle.kts) via `buildConfigField`:
 
-* `words` (`WordEntity`): term, normalizedTerm, baseLang, notes, tags, timestamps
-* `senses` (`SenseEntity`): pos, definition, ipa, examples\[], synonyms\[], antonyms\[], **audioUrls\[]**
-* `translations` (`TranslationEntity`): wordId, languageCode, text
-* `srs_state` (`SrsStateEntity`): easiness, intervalDays, repetitions, dueDate, lapses, historyJson
-* `quiz_results` (`QuizResultEntity`): mode, correct, timeMs, timestamp
-
-**Migrations**
-
-* **v1 → v2:** add `audioUrls` column to `senses` (TEXT JSON, default `'[]'`).
-  Database builder includes `addMigrations(MIGRATION_1_2)`.
+| Flag | Default | Description |
+| :--- | :---: | :--- |
+| `USE_MOCK` | `false` | When `true`, uses mock local dictionary responses for testing without internet. |
+| `DICT_BASE_URL` | `"https://api.dictionaryapi.dev"` | Free Dictionary API base URL. |
+| `ENABLE_TRANSLATION` | `false` | Toggles LibreTranslate language translation UI and backend service. |
+| `TRANSLATE_BASE_URL` | `"https://libretranslate.de"` | Base endpoint for LibreTranslate server. |
+| `TRANSLATE_API_KEY` | `""` | Optional authentication key for self-hosted translation servers. |
 
 ---
 
-## 🔔 Notifications & background
+## 🧪 Testing
 
-* Daily **WorkManager** job computes the due queue and shows a local notification.
-* Tap notification → deep-link to **Review**.
-* Android 13+ runtime permission: app requests **POST\_NOTIFICATIONS** on first run.
-* You can reschedule the worker by changing **Settings → Notify hour** (24h).
+KeepHub includes over 115 unit tests covering:
+* **SM-2 Spaced Repetition**: Intervals, ease-factor decay, lapse handling, and streak calculations.
+* **Gemini API Service**: Structured prompt generation, markdown fence stripping, model fallback chains, error diagnostic parsing, and key sanitization.
+* **Notification Scheduling**: WorkManager delay math, 2-minute safety window, self-reschedule logic, and notification builder attributes.
+* **Word Normalization**: Case, diacritics, plural inflections, and Levenshtein typo tolerances.
+* **Markdown Parser**: Stripping asterisks, applying bold and italic spans, and applying primary theme accents.
 
----
-
-## 🧭 Key flows
-
-### Add word
-
-1. Tap **Add** (or share text into the app).
-2. Type term, tags (comma-sep), optional notes.
-3. Duplicate detection runs as you type; open existing if found.
-4. Save → go to Word Details.
-
-### Word details
-
-* Shows language, tags, notes, meanings with POS/IPA, examples.
-* **Audio chips** play phonetics (if present).
-* **Refresh**:
-
-    * Fetches definitions/phonetics; caches to Room.
-    * (If translations enabled) fetches headword translation for the selected language.
-* **Delete**:
-
-    * Confirmation dialog; deletes word + senses + translations + srs + results.
-
-### Review session
-
-* **Start** → builds today’s queue (due items first, then new words).
-* Cycles through MCQ / Type / Cloze (based on Settings).
-* Grades mapped to SM-2; stores SRS state + quiz result.
-* **Summary** at the end (score + time).
-
----
-
-## 🧰 Troubleshooting
-
-* **“No translation cached” everywhere**
-  By design if `ENABLE_TRANSLATION=false`. To re-enable:
-
-    * Set `ENABLE_TRANSLATION=true`
-    * For real API: set `USE_MOCK=false`, `TRANSLATE_BASE_URL="https://libretranslate.de"` (or your server)
-    * Tap **Refresh** in Word Details (force replace supported)
-
-* **NetworkOnMainThreadException**
-  All clients use `Dispatchers.IO`. If you added custom calls, ensure you wrap blocking `execute()` with `withContext(Dispatchers.IO)`.
-
-* **Got HTML instead of JSON from translate API**
-  You’re hitting a website root, not the JSON endpoint. Use a LibreTranslate **API base** (no trailing slash) and POST to `/translate`.
-
-* **Material tokens error in Settings**
-  Remove imports from `androidx.compose.material3.tokens.*`; don’t access `.value` on `MaterialTheme` objects.
-
-* **Long details overflow**
-  Details screen uses `verticalScroll(rememberScrollState())`.
-
----
-
-## 🎨 App icon
-
-* Adaptive icon configured in `res/mipmap-anydpi-v26/ic_launcher.xml` & `ic_launcher_round.xml`.
-* PNG foreground/background (and optional monochrome) placed in `mipmap-*/`.
-* Manifest points to `@mipmap/ic_launcher` (and round variant).
-* Notification uses a separate single-color vector (e.g., `ic_stat_keephub`).
-
----
-
-## 🔐 Permissions
-
-* `INTERNET` (optional—only needed for real network)
-* `POST_NOTIFICATIONS` (runtime on Android 13+)
-
----
-
-## 📦 Build & install
-
-* Debug APK: `app/build/outputs/apk/debug/app-debug.apk`
-* Bundle (release): `./gradlew bundleRelease` (configure signing in `gradle.properties` or Android Studio)
-
----
-
-## 🗺️ Roadmap
-
-* Step 8: **Analytics & Stats** (streaks, accuracy by tag/POS, daily goal progress)
-* Step 9: **Import/Export** (JSON/CSV) + cloud backup guidance
-* Optional: audio playback improvements, richer distractors, bulk add, pronunciation caching per locale
-
----
-
-## 🤝 Contributing
-
-PRs welcome! Please:
-
-1. Keep modules clean (`:core-data` for data/DI/services; `:app` for UI/WorkManager).
-2. Add/extend tests for scheduler/repo changes.
-3. Avoid breaking Room migrations; bump DB `version` and provide migrations.
+Run tests using:
+```bash
+./gradlew testDebugUnitTest
+```
 
 ---
 
 ## 📄 License
+
 ```
-MIT License — © 2025 Bhishan Pangeni
+MIT License — © 2026 Bhishan Pangeni
 ```
-
----
-
-## 🙌 Credits
-
-* Dictionary data: **Free Dictionary API**
-* (Optional) Translations: **LibreTranslate** (self-hosted or public instance)
-
----
-
-### Quick start TL;DR
-
-```bash
-# clone & build
-./gradlew assembleDebug
-
-# run unit tests
-./gradlew :core-data:test
-
-# (optional) enable real dictionary/translate
-# edit :core-data/build.gradle.kts:
-# USE_MOCK=false, ENABLE_TRANSLATION=true, TRANSLATE_BASE_URL="https://libretranslate.de"
-
-# install on device
-adb install -r app/build/outputs/apk/debug/app-debug.apk
-```
-
-Happy building!
