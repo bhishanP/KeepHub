@@ -7,6 +7,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.keephub.app.notifications.ReviewNotification
+import com.keephub.core.data.daily.DailyWordsManager
 import com.keephub.core.data.repo.WordRepository
 import com.keephub.core.data.settings.SettingsStore
 import dagger.hilt.EntryPoint
@@ -30,6 +31,7 @@ class DueReviewWorker(
     interface AppDeps {
         fun repo(): WordRepository
         fun settings(): SettingsStore
+        fun dailyWordsManager(): DailyWordsManager
     }
 
     override suspend fun doWork(): Result {
@@ -39,8 +41,12 @@ class DueReviewWorker(
         val deps = EntryPointAccessors.fromApplication(ctx, AppDeps::class.java)
         val repo = deps.repo()
         val settings = deps.settings()
+        val dailyWordsManager = deps.dailyWordsManager()
 
         val today = LocalDate.now()
+        // Auto-enroll today's 5 words if enabled and not yet processed
+        runCatching { dailyWordsManager.ensureDailyWordsAutoAdded(today) }
+
         val goal = settings.dailyGoal.first()           // e.g., 20
         val ids = runCatching { repo.generateDailyQueue(goal, today) }.getOrElse { emptyList() }
         if (ids.isNotEmpty()) {

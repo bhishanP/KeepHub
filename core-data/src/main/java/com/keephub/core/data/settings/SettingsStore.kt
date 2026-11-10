@@ -16,6 +16,9 @@ object Keys {
     val THEME_MODE       = stringPreferencesKey("theme_mode")           // system | light | dark
     val DYNAMIC_COLOR    = booleanPreferencesKey("dynamic_color")       // true | false
     val GEMINI_API_KEY   = stringPreferencesKey("gemini_api_key")       // BYOK key
+    val DAILY_WORDS_LEVEL = stringPreferencesKey("daily_words_level")   // BEGINNER | INTERMEDIATE | ADVANCED
+    val LAST_DAILY_WORDS_DATE = stringPreferencesKey("last_daily_words_date") // YYYY-MM-DD
+    val DAILY_WORDS_AUTO_ADD = booleanPreferencesKey("daily_words_auto_add")   // default: true
 }
 
 class SettingsStore(private val context: Context) {
@@ -33,6 +36,12 @@ class SettingsStore(private val context: Context) {
         context.dataStore.data.map { it[Keys.DYNAMIC_COLOR] ?: true }
     val geminiApiKey: Flow<String> =
         context.dataStore.data.map { it[Keys.GEMINI_API_KEY] ?: "" }
+    val dailyWordsLevel: Flow<String> =
+        context.dataStore.data.map { it[Keys.DAILY_WORDS_LEVEL] ?: "INTERMEDIATE" }
+    val lastDailyWordsDate: Flow<String> =
+        context.dataStore.data.map { it[Keys.LAST_DAILY_WORDS_DATE] ?: "" }
+    val dailyWordsAutoAdd: Flow<Boolean> =
+        context.dataStore.data.map { it[Keys.DAILY_WORDS_AUTO_ADD] ?: true }
 
     suspend fun setTranslationLang(code: String) =
         context.dataStore.edit { it[Keys.TRANSLATION_LANG] = code }
@@ -54,4 +63,13 @@ class SettingsStore(private val context: Context) {
 
     suspend fun setGeminiApiKey(key: String) =
         context.dataStore.edit { it[Keys.GEMINI_API_KEY] = key.trim() }
+
+    suspend fun setDailyWordsLevel(level: String) =
+        context.dataStore.edit { it[Keys.DAILY_WORDS_LEVEL] = level.uppercase() }
+
+    suspend fun setLastDailyWordsDate(dateStr: String) =
+        context.dataStore.edit { it[Keys.LAST_DAILY_WORDS_DATE] = dateStr }
+
+    suspend fun setDailyWordsAutoAdd(enabled: Boolean) =
+        context.dataStore.edit { it[Keys.DAILY_WORDS_AUTO_ADD] = enabled }
 }

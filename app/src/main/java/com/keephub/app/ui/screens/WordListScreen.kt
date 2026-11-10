@@ -3,17 +3,22 @@ package com.keephub.app.ui.screens
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.automirrored.outlined.ArrowForwardIos
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.School
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
@@ -32,6 +37,10 @@ import androidx.lifecycle.viewModelScope
 import androidx.navigation.NavController
 import com.keephub.app.nav.Routes
 import com.keephub.app.ui.components.EmptyState
+import com.keephub.core.data.daily.DailyWordBank
+import com.keephub.core.data.daily.DailyWordsManager
+import com.keephub.core.data.daily.LeveledWord
+import com.keephub.core.data.daily.VocabularyLevel
 import com.keephub.core.data.db.entity.WordEntity
 import com.keephub.core.data.repo.WordRepository
 import java.time.Instant
@@ -40,9 +49,18 @@ import java.time.ZoneId
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import javax.inject.Inject
+
+data class DailyWordsSummary(
+    val level: VocabularyLevel = VocabularyLevel.INTERMEDIATE,
+    val words: List<LeveledWord> = emptyList(),
+    val enrolledCount: Int = 0,
+    val allEnrolled: Boolean = false
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -55,6 +73,7 @@ fun WordListScreen(
     val words by vm.items.collectAsState()
     val streak by vm.streak.collectAsState()
     val difficultIds by vm.difficultIds.collectAsState()
+    val dailySummary by vm.dailyWordsState.collectAsState()
 
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var isSearchActive by rememberSaveable { mutableStateOf(false) }
@@ -217,6 +236,14 @@ fun WordListScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 8.dp)
+                    )
+                }
+
+                // Today's 5 Words Banner
+                if (!isSearchActive && searchQuery.isBlank() && dailySummary.words.isNotEmpty()) {
+                    DailyWordsBannerCard(
+                        summary = dailySummary,
+                        onOpenDailyWords = { navController.navigate(Routes.DAILY_WORDS) }
                     )
                 }
 
@@ -395,9 +422,152 @@ private fun WordListItem(
     )
 }
 
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun DailyWordsBannerCard(
+    summary: DailyWordsSummary,
+    onOpenDailyWords: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        onClick = onOpenDailyWords,
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainer
+        ),
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 6.dp)
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Outlined.AutoAwesome,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+
+                    Column {
+                        Text(
+                            text = "Today's 5 Words",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "${summary.level.displayName} (${summary.level.cefr})",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = if (summary.allEnrolled) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.secondaryContainer
+                ) {
+                    Text(
+                        text = if (summary.allEnrolled) "5/5 Added" else "${summary.enrolledCount}/5 Added",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = if (summary.allEnrolled) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(10.dp))
+
+            // 5 Word chips preview
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                summary.words.forEach { w ->
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(12.dp)
+                            )
+                            Text(
+                                text = w.term,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Enrolled by default. Tap to learn & customize.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = "Teach Me",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Outlined.ArrowForward,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
 @HiltViewModel
 class WordListViewModel @Inject constructor(
-    repo: WordRepository
+    repo: WordRepository,
+    private val dailyWordsManager: DailyWordsManager
 ) : ViewModel() {
     val items: StateFlow<List<WordEntity>> =
         repo.observeAll()
@@ -413,6 +583,29 @@ class WordListViewModel @Inject constructor(
         repo.observeReviewTimestamps()
             .map { timestamps -> calculateStreak(timestamps) }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+
+    val dailyWordsState: StateFlow<DailyWordsSummary> =
+        combine(
+            dailyWordsManager.observeSelectedLevel(),
+            repo.observeAll()
+        ) { level, allWords ->
+            val allSavedTerms = allWords.map { it.normalizedTerm }.toSet()
+            val today = LocalDate.now()
+            val words = DailyWordBank.getWordsForDate(level, today, allSavedTerms)
+            val enrolledCount = words.count { it.term.lowercase() in allSavedTerms }
+            DailyWordsSummary(
+                level = level,
+                words = words,
+                enrolledCount = enrolledCount,
+                allEnrolled = enrolledCount == words.size
+            )
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DailyWordsSummary())
+
+    init {
+        viewModelScope.launch {
+            runCatching { dailyWordsManager.ensureDailyWordsAutoAdded() }
+        }
+    }
 
     companion object {
         fun calculateStreak(

@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.work.ExistingWorkPolicy
 import com.keephub.app.notifications.ReviewNotification
 import com.keephub.app.work.DueReviewWorker
+import com.keephub.core.data.daily.DailyWordsManager
 import com.keephub.core.data.settings.SettingsStore
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
@@ -16,11 +17,17 @@ import javax.inject.Inject
 class KeepHubApp : Application() {
 
     @Inject lateinit var settingsStore: SettingsStore
+    @Inject lateinit var dailyWordsManager: DailyWordsManager
 
     override fun onCreate() {
         super.onCreate()
         // Create channel early (safe no-op if exists)
         ReviewNotification.ensureChannel(this)
+
+        // Ensure today's 5 words are auto-enrolled on launch (default is YES)
+        CoroutineScope(Dispatchers.IO).launch {
+            runCatching { dailyWordsManager.ensureDailyWordsAutoAdded() }
+        }
 
         // Ensure daily reminder is scheduled using the user's saved notifyHour.
         // ExistingWorkPolicy.KEEP ensures active schedules are preserved without resetting countdown.

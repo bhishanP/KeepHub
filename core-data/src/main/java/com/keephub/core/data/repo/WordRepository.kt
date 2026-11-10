@@ -78,6 +78,10 @@ interface WordRepository {
     suspend fun resetAllReviews(): Boolean
 
     suspend fun deleteWord(wordId: Long): Boolean
+
+    suspend fun addLeveledWord(word: com.keephub.core.data.daily.LeveledWord, level: com.keephub.core.data.daily.VocabularyLevel): Long
+    suspend fun removeWordByTerm(term: String): Boolean
+    suspend fun isWordSaved(term: String): Boolean
 }
 
 @Singleton
@@ -361,6 +365,58 @@ class WordRepositoryImpl @Inject constructor(
         quizResultDao.clearAll()
         reviewSessionDao.clearAll()
         true
+    }
+
+    override suspend fun addLeveledWord(
+        word: com.keephub.core.data.daily.LeveledWord,
+        level: com.keephub.core.data.daily.VocabularyLevel
+    ): Long = withContext(Dispatchers.IO) {
+        val trimmed = word.term.trim()
+        val normalized = normalizer.normalizeForKey(trimmed)
+        val existing = wordDao.findByNormalized(normalized)
+        if (existing != null) {
+            return@withContext existing.id
+        }
+
+        val now = Instant.now()
+        val wordId = wordDao.insert(
+            WordEntity(
+                term = trimmed,
+                normalizedTerm = normalized,
+                baseLang = "en",
+                notes = "💡 Memory Tip: ${word.mnemonic}",
+                tags = listOf("Daily5", level.displayName),
+                createdAt = now,
+                updatedAt = now
+            )
+        )
+
+        val sense = SenseEntity(
+            wordId = wordId,
+            pos = word.pos,
+            definition = word.definition,
+            ipa = word.ipa,
+            examples = listOf(word.example),
+            synonyms = emptyList(),
+            antonyms = emptyList(),
+            audioUrls = emptyList()
+        )
+        senseDao.insertAll(listOf(sense))
+        wordId
+    }
+
+    override suspend fun removeWordByTerm(term: String): Boolean = withContext(Dispatchers.IO) {
+        val normalized = normalizer.normalizeForKey(term.trim())
+        val existing = wordDao.findByNormalized(normalized) ?: return@withContext false
+        wordDao.delete(existing.id)
+        senseDao.deleteByWord(existing.id)
+        srsDao.deleteByWord(existing.id)
+        true
+    }
+
+    override suspend fun isWordSaved(term: String): Boolean = withContext(Dispatchers.IO) {
+        val normalized = normalizer.normalizeForKey(term.trim())
+        wordDao.findByNormalized(normalized) != null
     }
 }
 

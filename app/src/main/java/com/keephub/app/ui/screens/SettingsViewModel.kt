@@ -39,6 +39,8 @@ class SettingsViewModel @Inject constructor(
     val themeMode = store.themeMode
     val dynamicColor = store.dynamicColor
     val geminiApiKey = store.geminiApiKey
+    val dailyWordsLevel = store.dailyWordsLevel
+    val dailyWordsAutoAdd = store.dailyWordsAutoAdd
 
     val totalWordsCount: StateFlow<Int> =
         repo.observeAll().map { it.size }
@@ -66,6 +68,8 @@ class SettingsViewModel @Inject constructor(
     fun setThemeMode(mode: String) = launch { store.setThemeMode(mode) }
     fun setDynamicColor(enabled: Boolean) = launch { store.setDynamicColor(enabled) }
     fun setGeminiApiKey(key: String) = launch { store.setGeminiApiKey(key) }
+    fun setDailyWordsLevel(level: String) = launch { store.setDailyWordsLevel(level) }
+    fun setDailyWordsAutoAdd(enabled: Boolean) = launch { store.setDailyWordsAutoAdd(enabled) }
 
     suspend fun testGeminiConnection(key: String): Boolean = gemini.testConnection(key)
     suspend fun testGeminiConnectionDetailed(key: String): GeminiTestResult = gemini.testConnectionDetailed(key)

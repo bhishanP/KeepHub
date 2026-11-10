@@ -26,6 +26,7 @@ import androidx.compose.material.icons.outlined.Keyboard
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.NotificationsOff
 import androidx.compose.material.icons.outlined.Remove
+import androidx.compose.material.icons.outlined.School
 import androidx.compose.material.icons.outlined.TextFields
 import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.material.icons.outlined.Visibility
@@ -66,6 +67,8 @@ fun SettingsScreen(
     val hour by vm.notifyHour.collectAsState(initial = 19)
     val isReminderActive by vm.isReminderActive.collectAsState()
     val geminiApiKey by vm.geminiApiKey.collectAsState(initial = "")
+    val dailyLevel by vm.dailyWordsLevel.collectAsState(initial = "INTERMEDIATE")
+    val dailyAutoAdd by vm.dailyWordsAutoAdd.collectAsState(initial = true)
 
     val areNotificationsEnabled = remember(context) {
         NotificationManagerCompat.from(context).areNotificationsEnabled()
@@ -211,6 +214,70 @@ fun SettingsScreen(
                             label = { Text(label) }
                         )
                     }
+                }
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            // --- Section: Daily 5 Words Learning ---
+            SectionCard(
+                title = "Daily 5 words",
+                subtitle = "Leveled daily vocabulary taught automatically",
+                icon = { Icon(Icons.Outlined.School, contentDescription = null) }
+            ) {
+                Text(
+                    text = "Proficiency level",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(Modifier.height(6.dp))
+
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    val levels = listOf(
+                        Triple("BEGINNER", "Beginner", "A1-A2"),
+                        Triple("INTERMEDIATE", "Intermediate", "B1-B2"),
+                        Triple("ADVANCED", "Advanced", "C1-C2 / GRE")
+                    )
+                    levels.forEach { (code, title, cefr) ->
+                        FilterChip(
+                            selected = dailyLevel.equals(code, ignoreCase = true),
+                            onClick = {
+                                vm.setDailyWordsLevel(code)
+                                scope.launch {
+                                    snackbarHostState.showSnackbar("Vocabulary level set to $title ($cefr)")
+                                }
+                            },
+                            label = { Text("$title ($cefr)") }
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(14.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Auto-add to vocabulary",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = "Adds today's 5 words automatically if you miss a day or don't choose (default: on)",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    Switch(
+                        checked = dailyAutoAdd,
+                        onCheckedChange = { vm.setDailyWordsAutoAdd(it) },
+                        modifier = Modifier.padding(start = 12.dp)
+                    )
                 }
             }
 

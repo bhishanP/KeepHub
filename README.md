@@ -28,6 +28,21 @@ The app is **100% offline-first**: all core functionalities, local Room caching,
 * **Pronunciation Audio**: High-fidelity phonetic audio playback using Android `MediaPlayer` and system TTS fallback.
 * **Tags & Personal Notes**: Organize words by exam (e.g. *GRE*, *TOEFL*, *IELTS*) or custom categories.
 
+### 🎓 Daily 5 Words Leveled Learning
+* **Curated 3-Tier Vocabulary Levels**:
+  * **Beginner (A1 - A2)**: Essential everyday foundational words for daily fluency (*achieve, ancient, curious, diligent, generous, sincere...*).
+  * **Intermediate (B1 - B2)**: High-frequency academic and professional vocabulary (*abundant, articulate, coherent, deliberate, inevitable, resilient...*).
+  * **Advanced (C1 - C2 / GRE)**: High-impact literary, competitive exam, and GRE words (*aberration, capricious, ephemeral, gregarious, meticulous, ubiquitous...*).
+* **Interactive Step-by-Step Teaching**:
+  * Large headword display with IPA phonetic transcription.
+  * 1-tap TTS native pronunciation audio button.
+  * Clear definition, real-world context sentence, and high-retention memory anchor (mnemonic).
+* **Frictionless Auto-Enrollment (Default YES)**:
+  * Each day's 5 words are enrolled into the user's vocabulary list by default, ensuring continuous streak and vocabulary growth even if the user misses a day or forgets to choose.
+  * Fully customizable: users can easily uncheck/skip any word they already know.
+  * Daily background sync: `DueReviewWorker` and app launch automatically auto-enroll the day's 5 words.
+  * Level selector: switch between Beginner, Intermediate, and Advanced anytime in Settings or directly from the learning screen.
+
 ### 🔁 Spaced Repetition System (SRS)
 * **SuperMemo SM-2 Algorithm**: Dynamically calculates `easiness`, `intervalDays`, `repetitions`, `lapses`, and `dueDate`.
 * **Daily Review Queue**: Automatically queues due cards and fills up to your configured daily goal with new words.

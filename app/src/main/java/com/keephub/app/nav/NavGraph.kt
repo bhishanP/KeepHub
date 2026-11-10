@@ -13,6 +13,7 @@ object Routes {
     const val WORD_DETAIL = "word_detail/{id}"
     const val REVIEW = "review"
     const val SETTINGS = "settings"
+    const val DAILY_WORDS = "daily_words"
 }
 
 @Composable
@@ -64,5 +65,6 @@ fun KeepHubNavHost(
 
         composable(Routes.REVIEW) { ReviewScreen(onBack = { nav.popBackStack() }) }
         composable(Routes.SETTINGS) { SettingsScreen(onBack = { nav.popBackStack() }) }
+        composable(Routes.DAILY_WORDS) { DailyWordsScreen(onBack = { nav.popBackStack() }) }
     }
 }
