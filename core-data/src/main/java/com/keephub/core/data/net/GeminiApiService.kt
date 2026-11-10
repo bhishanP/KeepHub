@@ -430,7 +430,7 @@ class GeminiApiService(
 
             Requirements:
             1. term: Single English headword in lowercase (e.g. "resilient", "allocate", "curious").
-            2. pos: Part of speech ("noun", "verb", "adjective", or "adverb").
+            2. pos: All applicable parts of speech for this word in contemporary English. If it can function as multiple types, list all applicable types separated by commas (e.g. "adjective, verb", "noun, verb", "verb, noun").
             3. ipa: Accurate International Phonetic Alphabet pronunciation (e.g. "/rɪˈzɪliənt/").
             4. definition: Clear, concise learner-friendly definition in plain English.
             5. example: A natural, contemporary example sentence demonstrating the word in context.
@@ -441,7 +441,7 @@ class GeminiApiService(
               "words": [
                 {
                   "term": "string",
-                  "pos": "verb | noun | adjective | adverb",
+                  "pos": "verb, noun | adjective, verb | noun | ...",
                   "ipa": "/.../",
                   "definition": "string",
                   "example": "string",

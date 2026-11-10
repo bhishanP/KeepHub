@@ -286,26 +286,35 @@ private fun DailyWordsContent(
         ) {
             Column(Modifier.padding(20.dp)) {
                 // Header tags row
-                Row(
+                FlowRow(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = MaterialTheme.colorScheme.primaryContainer
-                    ) {
-                        Text(
-                            text = if (uiState.isAiGenerated) {
-                                "✨ AI GENERATED • ${uiState.level.displayName.uppercase()} • ${uiState.level.cefr}"
-                            } else {
-                                "${uiState.level.displayName.uppercase()} • ${uiState.level.cefr}"
-                            },
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
+                    if (uiState.isAiGenerated) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.AutoAwesome,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(13.dp),
+                                    tint = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                                Text(
+                                    text = "AI GENERATED",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+                        }
                     }
 
                     Surface(
@@ -313,7 +322,7 @@ private fun DailyWordsContent(
                         color = MaterialTheme.colorScheme.surfaceContainerHighest
                     ) {
                         Text(
-                            text = currentItem.word.pos.uppercase(),
+                            text = "${uiState.level.displayName.uppercase()} • ${uiState.level.cefr}",
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -338,10 +347,12 @@ private fun DailyWordsContent(
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         if (currentItem.word.ipa.isNotBlank()) {
+                            Spacer(Modifier.height(2.dp))
                             Text(
                                 text = currentItem.word.ipa,
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.primary
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Medium
                             )
                         }
                     }
@@ -355,6 +366,40 @@ private fun DailyWordsContent(
                             contentDescription = "Pronounce ${currentItem.word.term}",
                             tint = MaterialTheme.colorScheme.primary
                         )
+                    }
+                }
+
+                Spacer(Modifier.height(10.dp))
+
+                // Parts of Speech Badges (supports multiple types e.g. "noun, verb", "adjective, noun")
+                val posList = remember(currentItem.word.pos) {
+                    currentItem.word.pos
+                        .split(Regex("[,/•;|]"))
+                        .map { it.trim().lowercase() }
+                        .filter { it.isNotBlank() }
+                        .distinct()
+                }
+
+                if (posList.isNotEmpty()) {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        posList.forEach { type ->
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = MaterialTheme.colorScheme.surfaceContainerHighest
+                            ) {
+                                Text(
+                                    text = type.uppercase(),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                )
+                            }
+                        }
                     }
                 }
 

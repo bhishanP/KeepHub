@@ -27,7 +27,7 @@ object DailyWordBank {
             ),
             LeveledWord(
                 term = "brave",
-                pos = "adjective",
+                pos = "adjective, verb",
                 ipa = "/breɪv/",
                 definition = "Ready to face and endure danger, pain, or difficulty; showing courage.",
                 example = "The brave firefighter entered the smoke-filled building to rescue the family.",
@@ -135,7 +135,7 @@ object DailyWordBank {
             ),
             LeveledWord(
                 term = "humble",
-                pos = "adjective",
+                pos = "adjective, verb",
                 ipa = "/ˈhʌmbl/",
                 definition = "Having or showing a modest or low estimate of one's own importance.",
                 example = "Despite winning the gold medal, the athlete remained humble and gracious.",
@@ -171,7 +171,7 @@ object DailyWordBank {
             ),
             LeveledWord(
                 term = "notice",
-                pos = "verb",
+                pos = "verb, noun",
                 ipa = "/ˈnəʊtɪs/",
                 definition = "To become aware of something by seeing, hearing, or observing it.",
                 example = "Did you notice the subtle improvement in your recall speed today?",
@@ -389,7 +389,7 @@ object DailyWordBank {
             ),
             LeveledWord(
                 term = "deliberate",
-                pos = "adjective",
+                pos = "adjective, verb",
                 ipa = "/dɪˈlɪbərət/",
                 definition = "Done consciously, intentionally, and after careful thought.",
                 example = "He made a deliberate choice to study vocabulary for thirty minutes each morning.",
@@ -533,7 +533,7 @@ object DailyWordBank {
             ),
             LeveledWord(
                 term = "obscure",
-                pos = "adjective",
+                pos = "adjective, verb",
                 ipa = "/əbˈskjʊər/",
                 definition = "Not discovered or known about; difficult to understand or see clearly.",
                 example = "The essay quoted an obscure eighteenth-century botanical manuscript.",
