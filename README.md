@@ -37,6 +37,11 @@ The app is **100% offline-first**: all core functionalities, local Room caching,
   3. **Cloze (Fill-in-the-blank)**: Deduce and type the missing word from a natural example sentence.
   4. **Audio**: Listen to the native pronunciation and match the correct meaning.
 * **Session Summary**: Visual review score, duration, accuracy breakdown, and 1-tap AI Story generation.
+* **Review History (Recent 10 Days / Limited Sessions)**:
+  * Automatically records finished Daily Review and Practice sessions with submitted answers, correct targets, semantic hints, and AI explanations.
+  * Prunes history automatically (retains the most recent 10 sessions / 10 days) to prevent database bloat.
+  * Interactive Session Inspector: tap any past session to review every question card, compare your answer with the target, and read saved feedback.
+  * On-Demand History AI Stories & Tutor Explanations: generate a vocabulary story or request AI mistake explanations for past sessions anytime.
 
 ### 🔔 Daily Reminders & Background Work
 * **WorkManager Scheduled Worker**: Checks due cards and schedules notifications at your configured reminder hour.

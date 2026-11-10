@@ -3,6 +3,8 @@ package com.keephub.app.ui.review
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.keephub.core.data.net.GeminiApiService
+import com.keephub.core.data.repo.ReviewSessionRecord
+import com.keephub.core.data.repo.SessionReviewItem
 import com.keephub.core.data.repo.WordRepository
 import com.keephub.core.data.settings.SettingsStore
 import com.keephub.core.data.util.WordNormalizer
@@ -54,6 +56,14 @@ class ReviewViewModel @Inject constructor(
     private val _storyState = MutableStateFlow<StoryUiState>(StoryUiState.Idle)
     val storyState: StateFlow<StoryUiState> = _storyState.asStateFlow()
 
+    val recentSessions: StateFlow<List<ReviewSessionRecord>> =
+        repo.observeRecentReviewSessions(limit = 10)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    private val _selectedHistorySession = MutableStateFlow<ReviewSessionRecord?>(null)
+    val selectedHistorySession: StateFlow<ReviewSessionRecord?> = _selectedHistorySession.asStateFlow()
+
+    private var currentSessionId: Long? = null
     private var queue: List<Long> = emptyList()
     private var questions: List<Question> = emptyList()
     private var questionStartMs: Long = 0L
@@ -93,6 +103,8 @@ class ReviewViewModel @Inject constructor(
     fun start(today: LocalDate = LocalDate.now(), practice: Boolean = false) {
         viewModelScope.launch {
             try {
+                currentSessionId = null
+                _selectedHistorySession.value = null
                 collected.clear()
                 queue = if (practice) {
                     repo.generatePracticeQueue(targetGoal)
@@ -365,7 +377,9 @@ class ReviewViewModel @Inject constructor(
                 userAnswer = userAnswer,
                 correctAnswer = correctAnswer,
                 correct = correct,
-                timeMs = elapsed
+                timeMs = elapsed,
+                term = term,
+                semanticNote = semanticNote
             )
             collected += row
 
@@ -409,6 +423,14 @@ class ReviewViewModel @Inject constructor(
                     )
                     if (!explanation.isNullOrBlank()) {
                         _ui.update { it.copy(feedback = fb.copy(explanation = explanation)) }
+                        val idx = collected.indexOfLast { it.wordId == cur.wordId }
+                        if (idx >= 0) {
+                            collected[idx] = collected[idx].copy(explanation = explanation)
+                            _ui.update { it.copy(summary = collected.toList()) }
+                        }
+                        currentSessionId?.let { sId ->
+                            repo.updateSessionItemExplanation(sId, cur.wordId, explanation)
+                        }
                     }
                 }
             } catch (_: Exception) {
@@ -432,6 +454,9 @@ class ReviewViewModel @Inject constructor(
                 val story = gemini.generateStory(apiKey, words)
                 if (!story.isNullOrBlank()) {
                     _storyState.value = StoryUiState.Success(story, words)
+                    currentSessionId?.let { sId ->
+                        repo.updateSessionStory(sId, story, words)
+                    }
                 } else {
                     _storyState.value = StoryUiState.Error("Could not generate story. Please check your network connection.")
                 }
@@ -454,6 +479,7 @@ class ReviewViewModel @Inject constructor(
                 current = null,
                 feedback = null
             )
+            persistCurrentSession()
         } else {
             _ui.value = ui.value.copy(
                 index = nextIndex,
@@ -461,6 +487,108 @@ class ReviewViewModel @Inject constructor(
                 feedback = null
             )
             questionStartMs = System.currentTimeMillis()
+        }
+    }
+
+    private fun persistCurrentSession() {
+        viewModelScope.launch {
+            try {
+                val sessionItems = collected.map { row ->
+                    SessionReviewItem(
+                        wordId = row.wordId,
+                        term = row.term,
+                        mode = row.mode.name,
+                        prompt = row.prompt,
+                        userAnswer = row.userAnswer,
+                        correctAnswer = row.correctAnswer,
+                        correct = row.correct,
+                        semanticNote = row.semanticNote,
+                        explanation = row.explanation,
+                        timeMs = row.timeMs
+                    )
+                }
+                val story = (_storyState.value as? StoryUiState.Success)?.story
+                val storyWords = questions.map { it.term }.distinct()
+                val id = repo.saveReviewSession(
+                    totalQuestions = questions.size,
+                    correctCount = ui.value.correctCount,
+                    elapsedMs = ui.value.elapsedMs,
+                    isPractice = ui.value.isPractice,
+                    story = story,
+                    storyWords = storyWords,
+                    items = sessionItems
+                )
+                currentSessionId = id
+            } catch (_: Exception) {}
+        }
+    }
+
+    fun selectHistorySession(session: ReviewSessionRecord) {
+        _selectedHistorySession.value = session
+    }
+
+    fun dismissHistorySession() {
+        _selectedHistorySession.value = null
+    }
+
+    fun requestExplanationForHistoryItem(sessionId: Long, item: SessionReviewItem) {
+        viewModelScope.launch {
+            _explaining.value = true
+            try {
+                val apiKey = settings.geminiApiKey.first()
+                if (apiKey.isNotBlank()) {
+                    val explanation = gemini.explainMistake(
+                        apiKey = apiKey,
+                        term = item.term,
+                        definition = item.correctAnswer,
+                        userAnswer = item.userAnswer,
+                        contextSentence = item.prompt
+                    )
+                    if (!explanation.isNullOrBlank()) {
+                        repo.updateSessionItemExplanation(sessionId, item.wordId, explanation)
+                        _selectedHistorySession.update { current ->
+                            if (current?.id == sessionId) {
+                                val updated = current.items.map {
+                                    if (it.wordId == item.wordId) it.copy(explanation = explanation) else it
+                                }
+                                current.copy(items = updated)
+                            } else current
+                        }
+                    }
+                }
+            } catch (_: Exception) {
+            } finally {
+                _explaining.value = false
+            }
+        }
+    }
+
+    fun generateStoryForHistorySession(session: ReviewSessionRecord) {
+        val words = if (session.storyWords.isNotEmpty()) session.storyWords else session.items.map { it.term }.distinct()
+        if (words.isEmpty()) return
+        viewModelScope.launch {
+            _storyState.value = StoryUiState.Loading
+            try {
+                val apiKey = settings.geminiApiKey.first()
+                if (apiKey.isBlank()) {
+                    _storyState.value = StoryUiState.Error("Please set your Gemini API key in Settings to generate AI stories.")
+                    return@launch
+                }
+                val story = gemini.generateStory(apiKey, words)
+                if (!story.isNullOrBlank()) {
+                    _storyState.value = StoryUiState.Success(story, words)
+                    repo.updateSessionStory(session.id, story, words)
+                    _selectedHistorySession.update { current ->
+                        if (current?.id == session.id) {
+                            current.copy(story = story, storyWords = words)
+                        } else current
+                    }
+                } else {
+                    _storyState.value = StoryUiState.Error("Could not generate story. Please check your network connection.")
+                }
+            } catch (e: Exception) {
+                _storyState.value = StoryUiState.Error(e.message ?: "Failed to generate story")
+            }
         }
     }
 
@@ -493,6 +621,8 @@ class ReviewViewModel @Inject constructor(
         queue = emptyList()
         questions = emptyList()
         collected.clear()
+        currentSessionId = null
+        _selectedHistorySession.value = null
         refreshDueCount()
     }
 }

@@ -26,7 +26,7 @@ object DataModule {
     fun provideDb(@ApplicationContext ctx: Context, json: Json): KeepHubDatabase =
         Room.databaseBuilder(ctx, KeepHubDatabase::class.java, "keephub.db")
             .addTypeConverter(Converters(json))
-            .addMigrations(KeepHubDatabase.MIGRATION_1_2)
+            .addMigrations(KeepHubDatabase.MIGRATION_1_2, KeepHubDatabase.MIGRATION_2_3)
             .build()
 
     @Provides fun provideWordDao(db: KeepHubDatabase) = db.wordDao()
@@ -34,6 +34,7 @@ object DataModule {
     @Provides fun provideTranslationDao(db: KeepHubDatabase) = db.translationDao()
     @Provides fun provideSrsDao(db: KeepHubDatabase) = db.srsDao()
     @Provides fun provideQuizDao(db: KeepHubDatabase) = db.quizResultDao()
+    @Provides fun provideReviewSessionDao(db: KeepHubDatabase) = db.reviewSessionDao()
 
     @Provides @Singleton
     fun provideSettings(@ApplicationContext ctx: Context) = SettingsStore(ctx)

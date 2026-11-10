@@ -70,5 +70,8 @@ data class AnswerRow(
     val userAnswer: String,
     val correctAnswer: String,
     val correct: Boolean,
-    val timeMs: Long
+    val timeMs: Long,
+    val term: String = "",
+    val semanticNote: String? = null,
+    val explanation: String? = null
 )

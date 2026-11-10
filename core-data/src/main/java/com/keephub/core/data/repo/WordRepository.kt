@@ -17,6 +17,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.keephub.core.data.db.dao.WordWithDetails
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.map
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.json.Json
 
 sealed interface AddWordResult {
     data class Success(val id: Long): AddWordResult
@@ -56,6 +60,21 @@ interface WordRepository {
     fun observeReviewTimestamps(): Flow<List<Instant>>
     fun observeDifficultWordIds(): Flow<List<Long>>
 
+    suspend fun saveReviewSession(
+        totalQuestions: Int,
+        correctCount: Int,
+        elapsedMs: Long,
+        isPractice: Boolean,
+        story: String?,
+        storyWords: List<String>,
+        items: List<SessionReviewItem>
+    ): Long
+
+    suspend fun updateSessionStory(sessionId: Long, story: String, words: List<String>)
+    suspend fun updateSessionItemExplanation(sessionId: Long, wordId: Long, explanation: String)
+    fun observeRecentReviewSessions(limit: Int = 10): Flow<List<ReviewSessionRecord>>
+    suspend fun getReviewSession(id: Long): ReviewSessionRecord?
+
     suspend fun resetAllReviews(): Boolean
 
     suspend fun deleteWord(wordId: Long): Boolean
@@ -72,7 +91,9 @@ class WordRepositoryImpl @Inject constructor(
     private val settings: SettingsStore,
     private val translator: TranslateService,
     private val srsDao: SrsDao,
-    private val quizResultDao: QuizResultDao
+    private val quizResultDao: QuizResultDao,
+    private val reviewSessionDao: ReviewSessionDao,
+    private val json: Json = Json { ignoreUnknownKeys = true; coerceInputValues = true }
 ) : WordRepository {
 
     override fun observeAll() = wordDao.observeAll()
@@ -273,10 +294,93 @@ class WordRepositoryImpl @Inject constructor(
         rows > 0
     }
 
+    override suspend fun saveReviewSession(
+        totalQuestions: Int,
+        correctCount: Int,
+        elapsedMs: Long,
+        isPractice: Boolean,
+        story: String?,
+        storyWords: List<String>,
+        items: List<SessionReviewItem>
+    ): Long = withContext(Dispatchers.IO) {
+        val itemsJson = json.encodeToString(ListSerializer(SessionReviewItem.serializer()), items)
+        val storyWordsJson = json.encodeToString(ListSerializer(String.serializer()), storyWords)
+        val entity = ReviewSessionEntity(
+            completedAt = Instant.now(),
+            totalQuestions = totalQuestions,
+            correctCount = correctCount,
+            elapsedMs = elapsedMs,
+            isPractice = isPractice,
+            story = story,
+            storyWordsJson = storyWordsJson,
+            itemsJson = itemsJson
+        )
+        val id = reviewSessionDao.insert(entity)
+        // Keep limited to recent 10 sessions / 10 days
+        reviewSessionDao.pruneOldSessions(keepCount = 10)
+        id
+    }
+
+    override suspend fun updateSessionStory(
+        sessionId: Long,
+        story: String,
+        words: List<String>
+    ): Unit = withContext(Dispatchers.IO) {
+        val existing = reviewSessionDao.getSessionById(sessionId) ?: return@withContext
+        val wordsJson = json.encodeToString(ListSerializer(String.serializer()), words)
+        reviewSessionDao.update(existing.copy(story = story, storyWordsJson = wordsJson))
+    }
+
+    override suspend fun updateSessionItemExplanation(
+        sessionId: Long,
+        wordId: Long,
+        explanation: String
+    ): Unit = withContext(Dispatchers.IO) {
+        val existing = reviewSessionDao.getSessionById(sessionId) ?: return@withContext
+        val currentItems: List<SessionReviewItem> = runCatching {
+            json.decodeFromString(ListSerializer(SessionReviewItem.serializer()), existing.itemsJson)
+        }.getOrDefault(emptyList())
+        val updated = currentItems.map {
+            if (it.wordId == wordId) it.copy(explanation = explanation) else it
+        }
+        val updatedJson = json.encodeToString(ListSerializer(SessionReviewItem.serializer()), updated)
+        reviewSessionDao.update(existing.copy(itemsJson = updatedJson))
+    }
+
+    override fun observeRecentReviewSessions(limit: Int): Flow<List<ReviewSessionRecord>> =
+        reviewSessionDao.observeRecentSessions(limit).map { list ->
+            list.map { it.toRecord(json) }
+        }
+
+    override suspend fun getReviewSession(id: Long): ReviewSessionRecord? = withContext(Dispatchers.IO) {
+        reviewSessionDao.getSessionById(id)?.toRecord(json)
+    }
+
     override suspend fun resetAllReviews(): Boolean = withContext(Dispatchers.IO) {
         srsDao.clearAll()
         quizResultDao.clearAll()
+        reviewSessionDao.clearAll()
         true
     }
+}
+
+private fun ReviewSessionEntity.toRecord(json: Json): ReviewSessionRecord {
+    val items: List<SessionReviewItem> = runCatching {
+        json.decodeFromString(ListSerializer(SessionReviewItem.serializer()), itemsJson)
+    }.getOrDefault(emptyList())
+    val words: List<String> = runCatching {
+        json.decodeFromString(ListSerializer(String.serializer()), storyWordsJson)
+    }.getOrDefault(emptyList())
+    return ReviewSessionRecord(
+        id = id,
+        completedAt = completedAt,
+        totalQuestions = totalQuestions,
+        correctCount = correctCount,
+        elapsedMs = elapsedMs,
+        isPractice = isPractice,
+        story = story,
+        storyWords = words,
+        items = items
+    )
 }
 
