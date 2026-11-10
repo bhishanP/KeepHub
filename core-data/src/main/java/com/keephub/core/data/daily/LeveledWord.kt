@@ -1,5 +1,8 @@
 package com.keephub.core.data.daily
 
+import kotlinx.serialization.Serializable
+
+@Serializable
 data class LeveledWord(
     val term: String,
     val pos: String,          // e.g. "adjective", "noun", "verb"

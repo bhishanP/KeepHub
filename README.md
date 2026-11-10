@@ -29,6 +29,10 @@ The app is **100% offline-first**: all core functionalities, local Room caching,
 * **Tags & Personal Notes**: Organize words by exam (e.g. *GRE*, *TOEFL*, *IELTS*) or custom categories.
 
 ### 🎓 Daily 5 Words Leveled Learning
+* **Dynamic AI Generation with Curated Offline Fallback**:
+  * **When AI is ON**: Gemini dynamically generates 5 fresh, high-value vocabulary words tailored to your CEFR level each day, complete with IPA, definition, real-world context sentence, and mnemonic, while filtering out words you've already learned.
+  * **When AI is OFF or Offline**: Seamlessly falls back to a 105+ word built-in curated dictionary across 3 CEFR levels without API latency or error.
+  * **Daily Caching**: Once generated for today, the 5 words are cached locally for zero-latency subsequent views.
 * **Curated 3-Tier Vocabulary Levels**:
   * **Beginner (A1 - A2)**: Essential everyday foundational words for daily fluency (*achieve, ancient, curious, diligent, generous, sincere...*).
   * **Intermediate (B1 - B2)**: High-frequency academic and professional vocabulary (*abundant, articulate, coherent, deliberate, inevitable, resilient...*).
@@ -39,8 +43,8 @@ The app is **100% offline-first**: all core functionalities, local Room caching,
   * Clear definition, real-world context sentence, and high-retention memory anchor (mnemonic).
 * **Frictionless Auto-Enrollment (Default YES)**:
   * Each day's 5 words are enrolled into the user's vocabulary list by default, ensuring continuous streak and vocabulary growth even if the user misses a day or forgets to choose.
-  * Fully customizable: users can easily uncheck/skip any word they already know.
-  * Daily background sync: `DueReviewWorker` and app launch automatically auto-enroll the day's 5 words.
+  * Fully customizable: words default to ON in the Study Words screen, and users can toggle off any word they wish to skip.
+  * Once reviewed ("Done Learning" or "Dismiss"), the home screen banner card is removed for the day.
   * Level selector: switch between Beginner, Intermediate, and Advanced anytime in Settings or directly from the learning screen.
 
 ### 🔁 Spaced Repetition System (SRS)
@@ -65,7 +69,8 @@ The app is **100% offline-first**: all core functionalities, local Room caching,
 * **Deep Linking**: Tapping the notification opens today's Review session immediately.
 
 ### 🎨 Material Design 3 (M3) UI & Polish
-* **Dynamic Theming & Dark Mode**: Full M3 color system support with system-matched dynamic palettes.
+* **Appearance & Theme Controls**: Dedicated Settings panel with M3 segmented buttons to toggle **System default**, **Light**, and **Dark** modes, plus a toggle for Android 12+ **Material You Dynamic Color** wallpaper palette extraction.
+* **M3 Action Hierarchy**: Standardized button roles (Filled `Button` for primary CTAs like "Study Words", low-emphasis `TextButton` for secondary actions like "Dismiss", and accessible 48dp touch targets).
 * **Tactile Steppers & Quick Presets**: Increment/decrement buttons (`[-]` / `[+]`) and 1-tap chips for Daily Goals (`5`, `10`, `20`, `30`, `50`) and Reminder Times (`Morning 08:00`, `Noon 12:00`, `Evening 18:00`, `Night 21:00`).
 * **Adaptive Keyboard Handling**: Comprehensive `Modifier.imePadding()` and `BringIntoViewRequester` integration ensures text editors and action buttons are never obscured by the software keyboard.
 * **Native Markdown Formatting**: In-app `MarkdownText` engine strips raw `**` delimiters and renders bold spans with theme accents.

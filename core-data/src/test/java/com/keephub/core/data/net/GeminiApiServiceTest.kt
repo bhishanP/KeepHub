@@ -351,4 +351,44 @@ class GeminiApiServiceTest {
         assertEquals("gemini-3.8-flash", success.modelUsed)
         assertEquals(2, callCount)
     }
+
+    @Test
+    fun testGenerateDailyWordsParsesSuccessfully() = runBlocking {
+        val fakeResponse = """
+            {
+              "candidates": [
+                {
+                  "content": {
+                    "parts": [
+                      {
+                        "text": "```json\n{\n  \"words\": [\n    {\n      \"term\": \"lucid\",\n      \"pos\": \"adjective\",\n      \"ipa\": \"/ˈluːsɪd/\",\n      \"definition\": \"Expressed clearly; easy to understand.\",\n      \"example\": \"She gave a lucid explanation of the complex theorem.\",\n      \"mnemonic\": \"Lucid sounds like liquid light—crystal clear.\"\n    },\n    {\n      \"term\": \"meticulous\",\n      \"pos\": \"adjective\",\n      \"ipa\": \"/məˈtɪkjələs/\",\n      \"definition\": \"Showing great attention to detail.\",\n      \"example\": \"He was meticulous about his code formatting.\",\n      \"mnemonic\": \"Meticulous meets every tiny detail.\"\n    },\n    {\n      \"term\": \"pragmatic\",\n      \"pos\": \"adjective\",\n      \"ipa\": \"/præɡˈmætɪk/\",\n      \"definition\": \"Dealing with things sensibly and realistically.\",\n      \"example\": \"We need a pragmatic approach to the problem.\",\n      \"mnemonic\": \"Pragmatic means practical.\"\n    },\n    {\n      \"term\": \"resilient\",\n      \"pos\": \"adjective\",\n      \"ipa\": \"/rɪˈzɪliənt/\",\n      \"definition\": \"Able to recover quickly from difficulties.\",\n      \"example\": \"She proved remarkably resilient.\",\n      \"mnemonic\": \"Resilient like a spring that bounces back.\"\n    },\n    {\n      \"term\": \"tangible\",\n      \"pos\": \"adjective\",\n      \"ipa\": \"/ˈtændʒəbl/\",\n      \"definition\": \"Perceptible by touch; clear and definite.\",\n      \"example\": \"We saw tangible results in two weeks.\",\n      \"mnemonic\": \"Tangible: you can touch it.\"\n    }\n  ]\n}\n```"
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val mockClient = OkHttpClient.Builder()
+            .addInterceptor { chain ->
+                Response.Builder()
+                    .request(chain.request())
+                    .protocol(Protocol.HTTP_1_1)
+                    .code(200)
+                    .message("OK")
+                    .body(fakeResponse.toResponseBody("application/json".toMediaType()))
+                    .build()
+            }
+            .build()
+
+        val service = GeminiApiService(mockClient, json)
+        val result = service.generateDailyWords("fake_key", "Intermediate (B1-B2)")
+
+        assertNotNull(result)
+        assertEquals(5, result?.size)
+        assertEquals("lucid", result?.first()?.term)
+        assertEquals("adjective", result?.first()?.pos)
+        assertEquals("Expressed clearly; easy to understand.", result?.first()?.definition)
+    }
 }

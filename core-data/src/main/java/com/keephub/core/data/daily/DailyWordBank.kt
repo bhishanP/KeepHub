@@ -961,32 +961,13 @@ object DailyWordBank {
 
     fun getWordsForDate(
         level: VocabularyLevel,
-        date: LocalDate,
-        existingTerms: Set<String> = emptySet()
+        date: LocalDate
     ): List<LeveledWord> {
         val pool = words[level] ?: words[VocabularyLevel.INTERMEDIATE]!!
         val epochDay = date.toEpochDay()
-        val startIndex = ((epochDay % pool.size + pool.size) % pool.size).toInt()
-
-        val result = mutableListOf<LeveledWord>()
-        var offset = 0
-        // Prioritize words that aren't already saved in user's vocabulary
-        while (result.size < 5 && offset < pool.size) {
-            val candidate = pool[(startIndex + offset) % pool.size]
-            if (candidate.term.lowercase() !in existingTerms) {
-                result.add(candidate)
-            }
-            offset++
+        val startIndex = ((epochDay * 5 % pool.size + pool.size) % pool.size).toInt()
+        return (0 until 5).map { i ->
+            pool[(startIndex + i) % pool.size]
         }
-        // If user already saved almost all words, backfill to guarantee 5 words
-        offset = 0
-        while (result.size < 5 && offset < pool.size) {
-            val candidate = pool[(startIndex + offset) % pool.size]
-            if (candidate !in result) {
-                result.add(candidate)
-            }
-            offset++
-        }
-        return result.take(5)
     }
 }

@@ -19,12 +19,16 @@ import androidx.compose.material.icons.automirrored.outlined.FormatListBulleted
 import androidx.compose.material.icons.outlined.AccessTime
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.BrightnessAuto
 import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.Flag
 import androidx.compose.material.icons.outlined.Headphones
 import androidx.compose.material.icons.outlined.Keyboard
+import androidx.compose.material.icons.outlined.LightMode
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.NotificationsOff
+import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material.icons.outlined.School
 import androidx.compose.material.icons.outlined.TextFields
@@ -69,6 +73,8 @@ fun SettingsScreen(
     val geminiApiKey by vm.geminiApiKey.collectAsState(initial = "")
     val dailyLevel by vm.dailyWordsLevel.collectAsState(initial = "INTERMEDIATE")
     val dailyAutoAdd by vm.dailyWordsAutoAdd.collectAsState(initial = true)
+    val themeMode by vm.themeMode.collectAsState(initial = "system")
+    val dynamicColor by vm.dynamicColor.collectAsState(initial = true)
 
     val areNotificationsEnabled = remember(context) {
         NotificationManagerCompat.from(context).areNotificationsEnabled()
@@ -214,6 +220,73 @@ fun SettingsScreen(
                             label = { Text(label) }
                         )
                     }
+                }
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            // --- Section: Appearance & Theme ---
+            SectionCard(
+                title = "Appearance",
+                subtitle = "Theme mode and Material You dynamic color",
+                icon = { Icon(Icons.Outlined.Palette, contentDescription = null) }
+            ) {
+                Text(
+                    text = "Theme mode",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(Modifier.height(8.dp))
+
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    val themeOptions = listOf(
+                        Triple("system", "System", Icons.Outlined.BrightnessAuto),
+                        Triple("light", "Light", Icons.Outlined.LightMode),
+                        Triple("dark", "Dark", Icons.Outlined.DarkMode)
+                    )
+                    themeOptions.forEachIndexed { index, (modeKey, label, icon) ->
+                        SegmentedButton(
+                            shape = SegmentedButtonDefaults.itemShape(index = index, count = themeOptions.size),
+                            onClick = { vm.setThemeMode(modeKey) },
+                            selected = themeMode == modeKey,
+                            icon = {
+                                Icon(
+                                    imageVector = icon,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            },
+                            label = { Text(label) }
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(14.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Dynamic Color",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = "Match system wallpaper palette on Android 12+",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    Switch(
+                        checked = dynamicColor,
+                        onCheckedChange = { vm.setDynamicColor(it) },
+                        modifier = Modifier.padding(start = 12.dp)
+                    )
                 }
             }
 

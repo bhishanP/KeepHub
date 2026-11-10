@@ -21,7 +21,8 @@ data class DailyWordsUiState(
     val words: List<DailyWordItem> = emptyList(),
     val currentIndex: Int = 0,
     val isLoading: Boolean = false,
-    val autoAddEnabled: Boolean = true
+    val autoAddEnabled: Boolean = true,
+    val isAiGenerated: Boolean = false
 )
 
 @HiltViewModel
@@ -71,13 +72,24 @@ class DailyWordsViewModel @Inject constructor(
     private suspend fun loadWordsForLevel(level: VocabularyLevel) {
         _uiState.update { it.copy(isLoading = true) }
         try {
+            val today = LocalDate.now()
             // First ensure today's 5 words are auto-enrolled (default is YES)
-            manager.ensureDailyWordsAutoAdded(LocalDate.now())
-            val words = manager.getDailyWords(LocalDate.now(), levelOverride = level)
+            manager.ensureDailyWordsAutoAdded(today)
+            var words = manager.getDailyWords(today, levelOverride = level)
+
+            // If none are enrolled yet (e.g. first time user opens Study Words or auto-add was off),
+            // enroll all 5 words by default as required.
+            if (words.isNotEmpty() && words.none { it.isEnrolled }) {
+                manager.enrollAll(words.map { it.word }, level)
+                words = manager.getDailyWords(today, levelOverride = level)
+            }
+
+            val isAi = manager.isAiGeneratedForToday(level, today)
             _uiState.update {
                 it.copy(
                     words = words,
                     isLoading = false,
+                    isAiGenerated = isAi,
                     currentIndex = it.currentIndex.coerceIn(0, (words.size - 1).coerceAtLeast(0))
                 )
             }
@@ -89,8 +101,17 @@ class DailyWordsViewModel @Inject constructor(
     fun changeLevel(level: VocabularyLevel) {
         viewModelScope.launch {
             manager.setLevel(level)
+            val today = LocalDate.now()
+            val newWords = manager.resolveWordsForDate(level, today)
+            manager.enrollAll(newWords, level)
             _uiState.update { it.copy(level = level, currentIndex = 0) }
             loadWordsForLevel(level)
+        }
+    }
+
+    fun markTodayReviewed() {
+        viewModelScope.launch {
+            manager.markTodayReviewed()
         }
     }
 

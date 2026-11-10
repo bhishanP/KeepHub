@@ -48,17 +48,12 @@ class DailyWordBankTest {
     }
 
     @Test
-    fun getWordsForDate_skipsExistingTerms() {
+    fun getWordsForDate_isDeterministicAndStable() {
         val date = LocalDate.of(2026, 11, 10)
-        val initialWords = DailyWordBank.getWordsForDate(VocabularyLevel.BEGINNER, date)
-        val existing = setOf(initialWords[0].term.lowercase())
-
-        val newWords = DailyWordBank.getWordsForDate(VocabularyLevel.BEGINNER, date, existingTerms = existing)
-        assertEquals(5, newWords.size)
-        assertFalse(
-            "Should not include already existing word",
-            newWords.any { it.term.equals(initialWords[0].term, ignoreCase = true) }
-        )
+        val firstFetch = DailyWordBank.getWordsForDate(VocabularyLevel.BEGINNER, date)
+        val secondFetch = DailyWordBank.getWordsForDate(VocabularyLevel.BEGINNER, date)
+        assertEquals(5, firstFetch.size)
+        assertEquals(firstFetch.map { it.term }, secondFetch.map { it.term })
     }
 
     @Test

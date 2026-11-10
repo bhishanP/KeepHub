@@ -393,6 +393,80 @@ class GeminiApiService(
         callGemini(cleanKey, prompt, jsonMime = false)
     }
 
+    @Serializable
+    data class AiDailyWordSchema(
+        val term: String,
+        val pos: String = "adjective",
+        val ipa: String = "",
+        val definition: String = "",
+        val example: String = "",
+        val mnemonic: String = ""
+    )
+
+    @Serializable
+    data class AiDailyWordsResponse(
+        val words: List<AiDailyWordSchema> = emptyList()
+    )
+
+    /**
+     * Dynamically generates 5 distinct, high-value vocabulary words for the given CEFR level.
+     */
+    suspend fun generateDailyWords(
+        apiKey: String,
+        level: String,
+        excludedTerms: List<String> = emptyList()
+    ): List<AiDailyWordSchema>? = withContext(Dispatchers.IO) {
+        val cleanKey = sanitizeApiKey(apiKey)
+        if (cleanKey.isBlank()) return@withContext null
+
+        val excludedClause = if (excludedTerms.isNotEmpty()) {
+            "Avoid these words that the user already knows: [${excludedTerms.take(60).joinToString(", ")}]."
+        } else ""
+
+        val prompt = """
+            You are an expert language learning curriculum designer and English lexicographer.
+            Generate exactly 5 distinct, practical, high-value vocabulary words for an English learner at the "$level" proficiency level.
+            $excludedClause
+
+            Requirements:
+            1. term: Single English headword in lowercase (e.g. "resilient", "allocate", "curious").
+            2. pos: Part of speech ("noun", "verb", "adjective", or "adverb").
+            3. ipa: Accurate International Phonetic Alphabet pronunciation (e.g. "/rɪˈzɪliənt/").
+            4. definition: Clear, concise learner-friendly definition in plain English.
+            5. example: A natural, contemporary example sentence demonstrating the word in context.
+            6. mnemonic: A memorable 1-sentence mnemonic, memory tip, or etymological hook to help remember it.
+
+            Output strict JSON matching this exact schema:
+            {
+              "words": [
+                {
+                  "term": "string",
+                  "pos": "verb | noun | adjective | adverb",
+                  "ipa": "/.../",
+                  "definition": "string",
+                  "example": "string",
+                  "mnemonic": "string"
+                }
+              ]
+            }
+        """.trimIndent()
+
+        try {
+            val raw = callGemini(cleanKey, prompt, jsonMime = true) ?: return@withContext null
+            val clean = raw
+                .removePrefix("```json")
+                .removePrefix("```")
+                .removeSuffix("```")
+                .trim()
+            val parsed = json.decodeFromString<AiDailyWordsResponse>(clean)
+            if (parsed.words.size >= 5) {
+                parsed.words.take(5)
+            } else null
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     fun buildPrompt(term: String, contextSentence: String?, baseLang: String): String {
         val contextClause = if (!contextSentence.isNullOrBlank()) {
             "The learner encountered this word in this sentence: \"$contextSentence\". Prioritize this context for the primary sense."

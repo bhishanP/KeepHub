@@ -18,7 +18,11 @@ object Keys {
     val GEMINI_API_KEY   = stringPreferencesKey("gemini_api_key")       // BYOK key
     val DAILY_WORDS_LEVEL = stringPreferencesKey("daily_words_level")   // BEGINNER | INTERMEDIATE | ADVANCED
     val LAST_DAILY_WORDS_DATE = stringPreferencesKey("last_daily_words_date") // YYYY-MM-DD
+    val LAST_DAILY_WORDS_REVIEWED_DATE = stringPreferencesKey("last_daily_words_reviewed_date") // YYYY-MM-DD
     val DAILY_WORDS_AUTO_ADD = booleanPreferencesKey("daily_words_auto_add")   // default: true
+    val AI_DAILY_WORDS_CACHE = stringPreferencesKey("ai_daily_words_cache")
+    val AI_DAILY_WORDS_DATE = stringPreferencesKey("ai_daily_words_date")
+    val AI_DAILY_WORDS_LEVEL = stringPreferencesKey("ai_daily_words_level")
 }
 
 class SettingsStore(private val context: Context) {
@@ -40,8 +44,16 @@ class SettingsStore(private val context: Context) {
         context.dataStore.data.map { it[Keys.DAILY_WORDS_LEVEL] ?: "INTERMEDIATE" }
     val lastDailyWordsDate: Flow<String> =
         context.dataStore.data.map { it[Keys.LAST_DAILY_WORDS_DATE] ?: "" }
+    val lastDailyWordsReviewedDate: Flow<String> =
+        context.dataStore.data.map { it[Keys.LAST_DAILY_WORDS_REVIEWED_DATE] ?: "" }
     val dailyWordsAutoAdd: Flow<Boolean> =
         context.dataStore.data.map { it[Keys.DAILY_WORDS_AUTO_ADD] ?: true }
+    val aiDailyWordsCache: Flow<String> =
+        context.dataStore.data.map { it[Keys.AI_DAILY_WORDS_CACHE] ?: "" }
+    val aiDailyWordsDate: Flow<String> =
+        context.dataStore.data.map { it[Keys.AI_DAILY_WORDS_DATE] ?: "" }
+    val aiDailyWordsLevel: Flow<String> =
+        context.dataStore.data.map { it[Keys.AI_DAILY_WORDS_LEVEL] ?: "" }
 
     suspend fun setTranslationLang(code: String) =
         context.dataStore.edit { it[Keys.TRANSLATION_LANG] = code }
@@ -70,6 +82,23 @@ class SettingsStore(private val context: Context) {
     suspend fun setLastDailyWordsDate(dateStr: String) =
         context.dataStore.edit { it[Keys.LAST_DAILY_WORDS_DATE] = dateStr }
 
+    suspend fun setLastDailyWordsReviewedDate(dateStr: String) =
+        context.dataStore.edit { it[Keys.LAST_DAILY_WORDS_REVIEWED_DATE] = dateStr }
+
     suspend fun setDailyWordsAutoAdd(enabled: Boolean) =
         context.dataStore.edit { it[Keys.DAILY_WORDS_AUTO_ADD] = enabled }
+
+    suspend fun setAiDailyWords(cacheJson: String, dateStr: String, level: String) =
+        context.dataStore.edit {
+            it[Keys.AI_DAILY_WORDS_CACHE] = cacheJson
+            it[Keys.AI_DAILY_WORDS_DATE] = dateStr
+            it[Keys.AI_DAILY_WORDS_LEVEL] = level
+        }
+
+    suspend fun clearAiDailyWords() =
+        context.dataStore.edit {
+            it.remove(Keys.AI_DAILY_WORDS_CACHE)
+            it.remove(Keys.AI_DAILY_WORDS_DATE)
+            it.remove(Keys.AI_DAILY_WORDS_LEVEL)
+        }
 }

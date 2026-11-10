@@ -158,7 +158,10 @@ fun DailyWordsScreen(
                         onNext = { vm.nextWord() },
                         onPrev = { vm.prevWord() },
                         onEnrollAll = { vm.enrollAll() },
-                        onDone = onBack
+                        onDone = {
+                            vm.markTodayReviewed()
+                            onBack()
+                        }
                     )
                 }
             }
@@ -293,7 +296,11 @@ private fun DailyWordsContent(
                         color = MaterialTheme.colorScheme.primaryContainer
                     ) {
                         Text(
-                            text = "${uiState.level.displayName.uppercase()} • ${uiState.level.cefr}",
+                            text = if (uiState.isAiGenerated) {
+                                "✨ AI GENERATED • ${uiState.level.displayName.uppercase()} • ${uiState.level.cefr}"
+                            } else {
+                                "${uiState.level.displayName.uppercase()} • ${uiState.level.cefr}"
+                            },
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onPrimaryContainer,

@@ -1,5 +1,8 @@
 package com.keephub.core.data.daily
 
+import kotlinx.serialization.Serializable
+
+@Serializable
 enum class VocabularyLevel(
     val code: String,
     val displayName: String,
